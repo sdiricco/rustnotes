@@ -106,6 +106,9 @@ release, on each platform you can reach:
 - Every native menu item, in both languages
 - Cmd/Ctrl+F inside a note opens the in-note find bar; Cmd/Ctrl+Shift+F opens global search
 - Light/dark switch, including the native title bar on macOS
+- Linux: native menu bar and open submenus remain readable in light and dark
+  themes, including after changing the app language and restarting. The native
+  window must use the GTK theme background, not the webview's fixed startup color.
 - Narrow window: sidebar becomes a drawer, Esc closes it
 
 ## Reporting bugs

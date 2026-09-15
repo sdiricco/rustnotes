@@ -155,6 +155,12 @@ pub fn run() {
             app.set_menu(m)?;
 
             if let Some(window) = app.get_webview_window("main") {
+                // GTK: la menubar e' trasparente e mostra lo sfondo nativo.
+                // Il #f6f6f6 della config rende il testo del tema scuro illeggibile.
+                // Ripristina lo sfondo di sistema solo sulla finestra, lasciando
+                // alla webview il colore iniziale configurato.
+                #[cfg(target_os = "linux")]
+                window.as_ref().window().set_background_color(None)?;
                 titlebar::install(&window);
             }
             demo::install(&handle);
