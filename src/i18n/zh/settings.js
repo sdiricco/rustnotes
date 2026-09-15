@@ -48,6 +48,7 @@ export default {
       desc: '输入时为无法识别的单词加下划线',
       langLabel: '语言',
       langDesc: '用于拼写检查的词典',
+      langNoteMac: '在 macOS 上，词典由“系统设置 > 键盘 > 拼写”决定',
       langIt: '意大利语',
       langEn: '英语',
       langEs: '西班牙语',

@@ -48,6 +48,7 @@ export default {
       desc: 'Souligne les mots non reconnus pendant la saisie',
       langLabel: 'Langue',
       langDesc: 'Dictionnaire utilisé pour la vérification orthographique',
+      langNoteMac: 'Sur macOS, le dictionnaire est celui choisi dans Réglages Système > Clavier > Orthographe',
       langIt: 'Italien',
       langEn: 'Anglais',
       langEs: 'Espagnol',

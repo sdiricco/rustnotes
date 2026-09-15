@@ -1,6 +1,6 @@
 [package]
 name = "rustnotes"
-version = "0.12.0"
+version = "0.12.1"
 description = "RustNotes: a simple, local-first notes app. Vue frontend, Rust backend (Tauri v2)."
 authors = ["Simone Di Ricco"]
 edition = "2021"
@@ -32,7 +32,8 @@ sys-locale = "0.3"
 # versioni gia' usate da tao, quindi nessuna crate in piu' da compilare.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSGeometry"] }
+# NSString + NSUserDefaults: spellcheck.rs.
+objc2-foundation = { version = "0.3", features = ["NSGeometry", "NSString", "NSUserDefaults"] }
 objc2-app-kit = { version = "0.3", features = [
     "NSToolbar",
     "NSWindow",

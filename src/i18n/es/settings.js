@@ -48,6 +48,7 @@ export default {
       desc: 'Subraya las palabras no reconocidas mientras escribe',
       langLabel: 'Idioma',
       langDesc: 'Diccionario usado para la revisión ortográfica',
+      langNoteMac: 'En macOS el diccionario es el elegido en Ajustes del Sistema > Teclado > Ortografía',
       langIt: 'Italiano',
       langEn: 'Inglés',
       langEs: 'Español',

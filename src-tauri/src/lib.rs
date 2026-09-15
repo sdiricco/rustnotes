@@ -5,6 +5,7 @@
 mod demo;
 mod file_transfer;
 mod menu;
+mod spellcheck;
 mod store;
 mod titlebar;
 mod update_check;
@@ -135,6 +136,9 @@ fn set_menu_language(app: AppHandle, lang: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Prima di creare la webview: WebKit legge lo stato una volta sola.
+    spellcheck::enable();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())

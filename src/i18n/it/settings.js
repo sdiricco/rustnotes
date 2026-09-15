@@ -48,6 +48,7 @@ export default {
       desc: 'Sottolinea le parole non riconosciute mentre scrivi',
       langLabel: 'Lingua',
       langDesc: 'Dizionario usato per la correzione',
+      langNoteMac: 'Su macOS il dizionario è quello scelto in Impostazioni di Sistema > Tastiera > Ortografia',
       langIt: 'Italiano',
       langEn: 'Inglese',
       langEs: 'Spagnolo',

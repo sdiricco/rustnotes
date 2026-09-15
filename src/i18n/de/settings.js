@@ -48,6 +48,7 @@ export default {
       desc: 'Unbekannte Wörter beim Tippen unterstreichen',
       langLabel: 'Sprache',
       langDesc: 'Wörterbuch für die Rechtschreibprüfung',
+      langNoteMac: 'Unter macOS wird das Wörterbuch aus Systemeinstellungen > Tastatur > Rechtschreibung verwendet',
       langIt: 'Italienisch',
       langEn: 'Englisch',
       langEs: 'Spanisch',

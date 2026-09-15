@@ -48,6 +48,7 @@ export default {
       desc: 'Underline unrecognized words as you type',
       langLabel: 'Language',
       langDesc: 'Dictionary used for spell checking',
+      langNoteMac: 'On macOS the dictionary is the one chosen in System Settings > Keyboard > Spelling',
       langIt: 'Italian',
       langEn: 'English',
       langEs: 'Spanish',

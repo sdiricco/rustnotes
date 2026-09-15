@@ -48,6 +48,7 @@ export default {
       desc: 'Sublinha palavras não reconhecidas enquanto você digita',
       langLabel: 'Idioma',
       langDesc: 'Dicionário usado na verificação ortográfica',
+      langNoteMac: 'No macOS o dicionário é o escolhido em Ajustes do Sistema > Teclado > Ortografia',
       langIt: 'Italiano',
       langEn: 'Inglês',
       langEs: 'Espanhol',

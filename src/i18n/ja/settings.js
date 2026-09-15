@@ -48,6 +48,7 @@ export default {
       desc: '入力中に認識できない単語に下線を表示します',
       langLabel: '言語',
       langDesc: 'スペルチェックに使用する辞書',
+      langNoteMac: 'macOS では、システム設定 > キーボード > スペルで選んだ辞書が使われます',
       langIt: 'イタリア語',
       langEn: '英語',
       langEs: 'スペイン語',

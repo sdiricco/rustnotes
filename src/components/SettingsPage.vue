@@ -156,7 +156,10 @@
                     <span class="switch-thumb"></span>
                   </button>
                 </div>
-                <div class="row" :class="{ 'is-disabled': !settings.spellcheck }">
+                <!-- Su macOS la lingua la decide NSSpellChecker (Impostazioni di
+                     Sistema), non l'attributo lang: il selettore sarebbe una
+                     promessa vuota, al suo posto una nota (vedi spellcheck.rs). -->
+                <div v-if="!isMac" class="row" :class="{ 'is-disabled': !settings.spellcheck }">
                   <div class="row-text">
                     <span class="row-label">{{ t('settings.editor.spell.langLabel') }}</span>
                     <span class="row-desc">{{ t('settings.editor.spell.langDesc') }}</span>
@@ -173,6 +176,7 @@
                   />
                 </div>
               </div>
+              <p v-if="isMac" class="group-note">{{ t('settings.editor.spell.langNoteMac') }}</p>
             </section>
           </template>
 
