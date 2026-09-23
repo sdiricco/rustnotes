@@ -180,6 +180,115 @@
             </section>
           </template>
 
+          <!-- ===================== Claude ===================== -->
+          <template v-else-if="current.id === 'claude'">
+            <!-- Nessuna chiave da inserire: l'app usa la CLI di Claude Code
+                 dell'utente (claude.rs). Qui si vede solo se c'e' e se e'
+                 loggata, con una prova per verificare il giro completo. -->
+            <section class="group">
+              <div class="group-title">{{ t('settings.claude.title') }}</div>
+              <div class="card">
+                <div class="row">
+                  <div class="row-text">
+                    <span class="row-label">{{ t('settings.claude.statusLabel') }}</span>
+                    <span class="row-desc">{{ t('settings.claude.statusDesc') }}</span>
+                  </div>
+                  <div class="btn-row">
+                    <Button
+                      v-if="claude?.found && !claude.loggedIn"
+                      :label="t('settings.claude.login')"
+                      size="small"
+                      @click="onClaudeLogin"
+                    >
+                      <template #icon><Icon icon="lucide:log-in" /></template>
+                    </Button>
+                    <Button
+                      :label="claudeChecking ? t('settings.claude.checking') : t('settings.claude.recheck')"
+                      severity="secondary"
+                      outlined
+                      size="small"
+                      :loading="claudeChecking"
+                      @click="refreshClaude"
+                    >
+                      <template #icon><Icon icon="lucide:refresh-cw" /></template>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="claude && !claudeChecking"
+                class="update-status"
+                :class="{ available: claude.found && claude.loggedIn }"
+                role="status"
+              >
+                <Icon :icon="claudeStatusIcon" />
+                <span v-if="!claude.found">
+                  {{ t('settings.claude.notFound') }} · {{ t('settings.claude.notFoundHint') }}
+                </span>
+                <span v-else-if="!claude.loggedIn">
+                  {{ t('settings.claude.found', { version: claude.version || '?' }) }} ·
+                  {{ t('settings.claude.notLoggedIn') }} · {{ t('settings.claude.notLoggedInHint') }}
+                </span>
+                <span v-else>
+                  {{ t('settings.claude.ready') }} · {{ t('settings.claude.found', { version: claude.version || '?' }) }}
+                  <code :title="claude.path">{{ claude.path }}</code>
+                </span>
+              </div>
+            </section>
+
+            <section v-if="claude?.found" class="group">
+              <div class="group-title">{{ t('settings.claude.testTitle') }}</div>
+              <div class="card">
+                <div class="row row-stack">
+                  <div class="row-text">
+                    <span class="row-label">{{ t('settings.claude.testLabel') }}</span>
+                  </div>
+                  <Textarea
+                    v-model="claudeInstruction"
+                    class="claude-textarea"
+                    rows="1"
+                    auto-resize
+                    :placeholder="t('settings.claude.testPlaceholder')"
+                  />
+                </div>
+                <div class="row row-stack">
+                  <div class="row-text">
+                    <span class="row-label">{{ t('settings.claude.textLabel') }}</span>
+                  </div>
+                  <Textarea
+                    v-model="claudeText"
+                    class="claude-textarea"
+                    rows="4"
+                    auto-resize
+                    :placeholder="t('settings.claude.textPlaceholder')"
+                  />
+                  <div class="btn-row">
+                    <Button
+                      :label="claudeBusy ? t('settings.claude.sending') : t('settings.claude.send')"
+                      severity="secondary"
+                      outlined
+                      size="small"
+                      :loading="claudeBusy"
+                      :disabled="!claudeInstruction.trim() || !claudeText.trim()"
+                      @click="onClaudeSend"
+                    >
+                      <template #icon><Icon icon="lucide:sparkles" /></template>
+                    </Button>
+                  </div>
+                </div>
+                <div v-if="claudeReply" class="row row-stack">
+                  <div class="row-text">
+                    <span class="row-label">{{ t('settings.claude.replyLabel') }}</span>
+                    <span class="row-desc">
+                      {{ t('settings.claude.meta', { ms: claudeReply.durationMs, cost: claudeReply.costUsd.toFixed(4) }) }}
+                    </span>
+                  </div>
+                  <pre class="claude-reply">{{ claudeReply.text }}</pre>
+                </div>
+              </div>
+            </section>
+          </template>
+
           <!-- ===================== Scorciatoie ===================== -->
           <template v-else-if="current.id === 'shortcuts'">
             <section v-for="group in shortcutGroups" :key="group.title" class="group">
@@ -316,6 +425,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
+import Textarea from 'primevue/textarea'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settings'
 import { useUiStore } from '../stores/ui'
@@ -422,6 +532,7 @@ const sections = computed(() => [
   { id: 'general', label: t('settings.sections.general'), icon: 'lucide:sliders-horizontal' },
   { id: 'appearance', label: t('settings.sections.appearance'), icon: 'lucide:palette' },
   { id: 'editor', label: t('settings.sections.editor'), icon: 'lucide:spell-check' },
+  { id: 'claude', label: t('settings.sections.claude'), icon: 'lucide:sparkles' },
   { id: 'shortcuts', label: t('settings.sections.shortcuts'), icon: 'lucide:keyboard' },
   { id: 'about', label: t('settings.sections.about'), icon: 'lucide:info' }
 ])
@@ -434,6 +545,87 @@ const current = computed(
 // categoria. A finestra larga e' irrilevante, si vedono entrambi.
 const detailOpen = ref(false)
 const showingDetailOnNarrow = computed(() => ui.narrow && detailOpen.value)
+
+// Claude Code: stato della CLI letto da Rust quando si entra nella scheda
+// (non all'avvio: lancia due processi). La prova manda istruzione + testo
+// e mostra la risposta grezza, per verificare il giro senza toccare l'editor.
+const claude = ref(null)
+const claudeChecking = ref(false)
+const claudeInstruction = ref('')
+const claudeText = ref('')
+const claudeReply = ref(null)
+const claudeBusy = ref(false)
+
+const claudeStatusIcon = computed(() => {
+  if (!claude.value?.found) return 'lucide:circle-x'
+  if (!claude.value.loggedIn) return 'lucide:circle-alert'
+  return 'lucide:check-circle'
+})
+
+async function refreshClaude() {
+  claudeChecking.value = true
+  try {
+    claude.value = await api.claudeStatus()
+  } catch {
+    claude.value = { found: false, loggedIn: false }
+  } finally {
+    claudeChecking.value = false
+  }
+}
+
+watch(
+  () => ui.settingsOpen && current.value.id === 'claude',
+  (on) => {
+    if (on && !claude.value) refreshClaude()
+  },
+  { immediate: true }
+)
+
+// Dopo "Accedi" il login avviene in Terminal, fuori dall'app: si ricontrolla
+// lo stato ogni pochi secondi finche' non risulta loggato (o per 3 minuti).
+let claudePoll = null
+function stopClaudePoll() {
+  if (claudePoll) clearInterval(claudePoll)
+  claudePoll = null
+}
+async function onClaudeLogin() {
+  try {
+    await api.claudeLogin()
+  } catch (err) {
+    toast.add({ severity: 'error', summary: t('settings.claude.errFailed'), detail: err?.message || String(err), life: 8000 })
+    return
+  }
+  stopClaudePoll()
+  const startedAt = Date.now()
+  claudePoll = setInterval(async () => {
+    if (Date.now() - startedAt > 3 * 60 * 1000) return stopClaudePoll()
+    if (claudeChecking.value) return
+    await refreshClaude()
+    if (claude.value?.loggedIn) stopClaudePoll()
+  }, 3000)
+}
+onBeforeUnmount(stopClaudePoll)
+
+const CLAUDE_ERRORS = {
+  'not-found': 'settings.claude.errNotFound',
+  'not-logged-in': 'settings.claude.errNotLoggedIn',
+  timeout: 'settings.claude.errTimeout'
+}
+
+async function onClaudeSend() {
+  claudeBusy.value = true
+  claudeReply.value = null
+  try {
+    claudeReply.value = await api.claudeRun(claudeInstruction.value.trim(), claudeText.value)
+  } catch (err) {
+    const key = CLAUDE_ERRORS[err?.code] || 'settings.claude.errFailed'
+    toast.add({ severity: 'error', summary: t(key), detail: err?.message || String(err), life: 8000 })
+    // Lo stato puo' essere cambiato (logout nel frattempo): si riallinea.
+    if (err?.code === 'not-found' || err?.code === 'not-logged-in') refreshClaude()
+  } finally {
+    claudeBusy.value = false
+  }
+}
 
 // All'apertura si atterra sul dettaglio solo se e' stato chiesto (voce di
 // menu "Scorciatoie"), altrimenti sull'elenco, che e' la pagina "casa".
@@ -940,6 +1132,25 @@ kbd {
   border: 1px solid var(--p-content-border-color);
   border-radius: 5px;
   box-shadow: 0 1px 0 var(--p-content-border-color);
+}
+
+.claude-textarea {
+  width: 100%;
+  font-size: 13px;
+  resize: none;
+}
+.claude-reply {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--search-bg);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
 }
 
 .update-status {

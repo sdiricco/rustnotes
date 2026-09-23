@@ -10,7 +10,8 @@ export default {
     appearance: '外観',
     editor: 'エディタ',
     shortcuts: 'ショートカット',
-    about: '情報'
+    about: '情報',
+    claude: 'Claude'
   },
 
   general: {
@@ -121,5 +122,34 @@ export default {
     checkUpdates: 'アップデートを確認',
     available: 'バージョン{version}が利用可能です — 次のコマンドを実行してください:',
     upToDate: '最新バージョンを使用しています'
+  },
+
+  claude: {
+    title: 'Claude Code',
+    statusLabel: 'コマンドラインツール',
+    statusDesc: 'RustNotesはこのMacにインストール済みのClaude Code CLIを使用します。アプリにAPIキーは保存されません。',
+    recheck: '再確認',
+    checking: '確認中…',
+    found: 'バージョン{version}',
+    notFound: '見つかりません',
+    notFoundHint: 'Claude Codeをインストールし、ターミナルで一度`claude`を実行してサインインしてください。',
+    notLoggedIn: 'サインインしていません',
+    notLoggedInHint: '「サインイン」を押すと、Claude Codeのログイン画面でターミナルが開きます。',
+    login: 'サインイン',
+    loginDone: 'このウィンドウを閉じてRustNotesに戻ってください。',
+    ready: '準備完了',
+    testTitle: '試す',
+    testLabel: '指示',
+    testPlaceholder: '例: スペルと文法を修正',
+    textLabel: 'テキスト',
+    textPlaceholder: 'ここにテキストを貼り付け',
+    send: '送信',
+    sending: 'Claudeの応答を待っています…',
+    replyLabel: '返答',
+    meta: '{ms} ms · ${cost}',
+    errNotFound: 'Claude Codeが見つかりません',
+    errNotLoggedIn: '先にターミナルでClaude Codeにサインインしてください',
+    errTimeout: 'Claudeが時間内に応答しませんでした',
+    errFailed: 'Claudeへのリクエストに失敗しました'
   }
 }

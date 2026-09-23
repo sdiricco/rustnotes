@@ -10,7 +10,8 @@ export default {
     appearance: 'Aspetto',
     editor: 'Editor',
     shortcuts: 'Scorciatoie',
-    about: 'Informazioni'
+    about: 'Informazioni',
+    claude: 'Claude'
   },
 
   general: {
@@ -121,5 +122,34 @@ export default {
     checkUpdates: 'Controlla aggiornamenti',
     available: 'Versione {version} disponibile — esegui',
     upToDate: 'Hai già la versione più recente'
+  },
+
+  claude: {
+    title: 'Claude Code',
+    statusLabel: 'Strumento a riga di comando',
+    statusDesc: 'RustNotes usa la CLI di Claude Code già installata su questo Mac. Nessuna chiave API viene salvata nell\'app.',
+    recheck: 'Ricontrolla',
+    checking: 'Controllo…',
+    found: 'Versione {version}',
+    notFound: 'Non trovata',
+    notFoundHint: 'Installa Claude Code, poi apri il Terminale ed esegui `claude` una volta per accedere.',
+    notLoggedIn: 'Accesso non effettuato',
+    notLoggedInHint: 'Premi Accedi: si apre il Terminale con il login di Claude Code.',
+    login: 'Accedi',
+    loginDone: 'Puoi chiudere questa finestra e tornare a RustNotes.',
+    ready: 'Pronta',
+    testTitle: 'Prova',
+    testLabel: 'Istruzione',
+    testPlaceholder: 'es. Correggi ortografia e grammatica',
+    textLabel: 'Testo',
+    textPlaceholder: 'Incolla qui un testo',
+    send: 'Invia',
+    sending: 'In attesa di Claude…',
+    replyLabel: 'Risposta',
+    meta: '{ms} ms · ${cost}',
+    errNotFound: 'Claude Code non trovato',
+    errNotLoggedIn: 'Prima accedi a Claude Code dal Terminale',
+    errTimeout: 'Claude non ha risposto in tempo',
+    errFailed: 'Richiesta a Claude fallita'
   }
 }

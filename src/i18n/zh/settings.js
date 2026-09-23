@@ -10,7 +10,8 @@ export default {
     appearance: '外观',
     editor: '编辑器',
     shortcuts: '快捷键',
-    about: '关于'
+    about: '关于',
+    claude: 'Claude'
   },
 
   general: {
@@ -121,5 +122,34 @@ export default {
     checkUpdates: '检查更新',
     available: '{version} 版可用 — 请运行',
     upToDate: '您已安装最新版本'
+  },
+
+  claude: {
+    title: 'Claude Code',
+    statusLabel: '命令行工具',
+    statusDesc: 'RustNotes 使用这台 Mac 上已安装的 Claude Code 命令行工具。应用中不保存任何 API 密钥。',
+    recheck: '重新检查',
+    checking: '检查中…',
+    found: '版本 {version}',
+    notFound: '未找到',
+    notFoundHint: '请安装 Claude Code，然后打开终端运行一次 `claude` 以登录。',
+    notLoggedIn: '未登录',
+    notLoggedInHint: '点击“登录”：终端将打开并进入 Claude Code 登录流程。',
+    login: '登录',
+    loginDone: '您可以关闭此窗口并返回 RustNotes。',
+    ready: '就绪',
+    testTitle: '试一试',
+    testLabel: '指令',
+    testPlaceholder: '例如：修正拼写和语法',
+    textLabel: '文本',
+    textPlaceholder: '在此粘贴文本',
+    send: '发送',
+    sending: '等待 Claude 回复…',
+    replyLabel: '回复',
+    meta: '{ms} ms · ${cost}',
+    errNotFound: '未找到 Claude Code',
+    errNotLoggedIn: '请先在终端登录 Claude Code',
+    errTimeout: 'Claude 未及时回复',
+    errFailed: '向 Claude 发送请求失败'
   }
 }

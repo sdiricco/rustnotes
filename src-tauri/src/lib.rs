@@ -2,6 +2,7 @@
 //! nome del canale IPC Electron originale, per rendere il porting di
 //! `utils/api.js` una traduzione riga per riga.
 
+mod claude;
 mod demo;
 mod file_transfer;
 mod menu;
@@ -217,6 +218,9 @@ pub fn run() {
             file_transfer::import_md,
             file_transfer::pick_image,
             file_transfer::read_local_image,
+            claude::claude_status,
+            claude::claude_login,
+            claude::claude_run,
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione Tauri");

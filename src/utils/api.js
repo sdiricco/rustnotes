@@ -89,5 +89,13 @@ export const api = {
   zoomIn: () => invoke('zoom_in'),
   zoomOut: () => invoke('zoom_out'),
   zoomReset: () => invoke('zoom_reset'),
-  onZoomChanged: (callback) => bridgeEvent('zoom:changed', callback)
+  onZoomChanged: (callback) => bridgeEvent('zoom:changed', callback),
+
+  // Claude tramite la CLI di Claude Code (claude.rs). Lo stato dice se il
+  // binario c'e' e se l'utente e' loggato; run manda istruzione + testo e
+  // ritorna { text, costUsd, durationMs } o rigetta con { code, message }.
+  claudeStatus: () => invoke('claude_status'),
+  // Apre Terminal con `claude auth login`; la riga finale e' tradotta qui.
+  claudeLogin: () => invoke('claude_login', { doneMessage: t('settings.claude.loginDone') }),
+  claudeRun: (instruction, text) => invoke('claude_run', { instruction, text })
 }

@@ -25,7 +25,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "process", "io-util"] }
 sys-locale = "0.3"
 
 # Solo macOS: barra del titolo alta con NSToolbar vuota (titlebar.rs). Stesse

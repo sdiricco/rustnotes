@@ -10,7 +10,8 @@ export default {
     appearance: 'Appearance',
     editor: 'Editor',
     shortcuts: 'Shortcuts',
-    about: 'About'
+    about: 'About',
+    claude: 'Claude'
   },
 
   general: {
@@ -121,5 +122,34 @@ export default {
     checkUpdates: 'Check for Updates',
     available: 'Version {version} available — run',
     upToDate: 'You have the latest version'
+  },
+
+  claude: {
+    title: 'Claude Code',
+    statusLabel: 'Command-line tool',
+    statusDesc: 'RustNotes uses the Claude Code CLI already installed on this Mac. No API key is stored in the app.',
+    recheck: 'Check again',
+    checking: 'Checking…',
+    found: 'Version {version}',
+    notFound: 'Not found',
+    notFoundHint: 'Install Claude Code, then open Terminal and run `claude` once to sign in.',
+    notLoggedIn: 'Not signed in',
+    notLoggedInHint: 'Press Sign in: Terminal opens with the Claude Code login.',
+    login: 'Sign in',
+    loginDone: 'You can close this window and go back to RustNotes.',
+    ready: 'Ready',
+    testTitle: 'Try it',
+    testLabel: 'Instruction',
+    testPlaceholder: 'e.g. Fix spelling and grammar',
+    textLabel: 'Text',
+    textPlaceholder: 'Paste some text here',
+    send: 'Send',
+    sending: 'Waiting for Claude…',
+    replyLabel: 'Reply',
+    meta: '{ms} ms · ${cost}',
+    errNotFound: 'Claude Code not found',
+    errNotLoggedIn: 'Sign in to Claude Code from Terminal first',
+    errTimeout: 'Claude did not reply in time',
+    errFailed: 'Claude request failed'
   }
 }
