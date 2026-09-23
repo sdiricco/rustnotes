@@ -541,6 +541,7 @@ const shortcutGroups = computed(() => [
       { label: t('settings.shortcuts.formatting.quote'), keys: [MOD, SHIFT, 'B'] },
       { label: t('settings.shortcuts.formatting.codeBlock'), keys: [MOD, SHIFT, 'C'] },
       { label: t('settings.shortcuts.formatting.insertLink'), keys: [MOD, 'K'] },
+      { label: t('quill.contextMenu.pastePlain'), keys: [MOD, ALT, SHIFT, 'V'] },
       { label: t('settings.shortcuts.formatting.undoRedo'), keys: [MOD, '(⇧) Z'] }
     ]
   }

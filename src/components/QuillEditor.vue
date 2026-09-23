@@ -248,6 +248,7 @@ import { useSettingsStore } from '../stores/settings'
 import { api } from '../utils/api'
 import { shortcut } from '../utils/shortcuts'
 import { htmlToMarkdown } from '../utils/markdown'
+import { RustNotesClipboard } from '../utils/quillClipboard'
 import { Vue3ColorPicker } from '@cyhnkckali/vue3-color-picker'
 import '@cyhnkckali/vue3-color-picker/dist/style.css'
 
@@ -285,6 +286,9 @@ SearchHighlightActiveBlot.tagName = 'mark'
 SearchHighlightActiveBlot.className = 'ql-search-highlight-active'
 Quill.register(SearchHighlightBlot, true)
 Quill.register(SearchHighlightActiveBlot, true)
+// Incolla dall'esterno senza colori di testo/sfondo della sorgente (vedi
+// utils/quillClipboard.js): sostituisce il modulo clipboard di default.
+Quill.register('modules/clipboard', RustNotesClipboard, true)
 
 // Icona per il codice inline: di default Quill usa la stessa "</>" sia per
 // code-block che per code (icons.js mappa entrambi su codeIcon). La versione
@@ -1134,7 +1138,22 @@ const editorBindings = {
   checkList: { key: 57, shortKey: true, shiftKey: true, handler(r, c) { const on = c.format.list === 'checked' || c.format.list === 'unchecked'; this.quill.format('list', on ? false : 'unchecked', 'user'); return false } },
   blockquote: { key: 66, shortKey: true, shiftKey: true, handler(r, c) { this.quill.format('blockquote', !c.format.blockquote, 'user'); return false } },
   codeBlock: { key: 67, shortKey: true, shiftKey: true, handler(r, c) { this.quill.format('code-block', !c.format['code-block'], 'user'); return false } },
-  link: { key: 75, shortKey: true, handler(r) { openLinkPromptForRange(r); return false } }
+  link: { key: 75, shortKey: true, handler(r) { openLinkPromptForRange(r); return false } },
+  // ⌥⇧⌘V, "Incolla e adatta stile" standard di macOS: stessa logica della voce
+  // omonima del menu contestuale.
+  pastePlain: { key: 86, shortKey: true, shiftKey: true, altKey: true, handler(r) { pastePlain(r); return false } }
+}
+
+// Incolla solo il testo degli appunti, sostituendo l'eventuale selezione come
+// farebbe un incolla normale. execCommand('paste') incollerebbe sempre con la
+// formattazione della sorgente, quindi si legge direttamente dagli appunti;
+// funziona perché parte da un gesto dell'utente (tasto o voce di menu).
+async function pastePlain(range) {
+  const text = await navigator.clipboard.readText()
+  if (!text || !range) return
+  if (range.length) quill.deleteText(range.index, range.length, 'user')
+  quill.insertText(range.index, text, 'user')
+  quill.setSelection(range.index + text.length, 0, 'user')
 }
 
 // Il bottone tabella non corrisponde a un toggle di formattazione: inserisce
@@ -1225,18 +1244,9 @@ async function runContextAction(value) {
       // equivalente basato su navigator.clipboard.
       document.execCommand(value)
       break
-    case 'paste-plain': {
-      // execCommand('paste') incolla sempre con la formattazione della
-      // sorgente: per il testo semplice serve leggere gli appunti e inserirli
-      // come testo puro, sostituendo l'eventuale selezione come farebbe un
-      // incolla normale.
-      const text = await navigator.clipboard.readText()
-      if (!text || !range) break
-      if (range.length) quill.deleteText(range.index, range.length, 'user')
-      quill.insertText(range.index, text, 'user')
-      quill.setSelection(range.index + text.length, 0, 'user')
+    case 'paste-plain':
+      await pastePlain(range)
       break
-    }
     case 'bold':
     case 'italic':
     case 'underline':
