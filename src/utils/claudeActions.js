@@ -45,6 +45,30 @@ export function buildInstruction(action, { inline }) {
   return `${action.instruction}\n${inline ? HINT_PLAIN : HINT_MARKDOWN}`
 }
 
+// Istruzione libera scritta dall'utente nel popup.
+export function buildFree(userInstruction, { inline }) {
+  return `Apply this instruction to the text below: ${userInstruction.trim()}\n${inline ? HINT_PLAIN : HINT_MARKDOWN}`
+}
+
+// Seguito su una proposta gia' fatta ("piu' corto", "tono formale"): niente
+// sessione persistente, si rimanda tutto in una chiamata sola. Il testo
+// originale resta il `text` della richiesta (dopo il separatore), la versione
+// precedente va nell'istruzione.
+export function buildFollowUp(refinement, previous, { inline }) {
+  return [
+    'You previously rewrote the text below (the ORIGINAL) into the PREVIOUS VERSION shown here.',
+    'Now apply this instruction to the previous version, keeping everything else as it was:',
+    refinement.trim(),
+    'Reply only with the new version.',
+    inline ? HINT_PLAIN : HINT_MARKDOWN,
+    '',
+    '--- PREVIOUS VERSION ---',
+    previous,
+    '',
+    '--- ORIGINAL ---'
+  ].join('\n')
+}
+
 // Il modello a volte incornicia comunque la risposta in un blocco di codice:
 // si toglie solo la cornice esterna, il contenuto resta com'e'.
 export function stripOuterFence(text) {

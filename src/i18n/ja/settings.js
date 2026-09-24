@@ -70,7 +70,8 @@ export default {
       settings: '設定',
       zoomIn: '拡大',
       zoomOut: '縮小',
-      zoomReset: '実際のサイズ'
+      zoomReset: '実際のサイズ',
+      claude: 'Claudeアシスタント'
     },
     formatting: {
       title: '書式（エディタ内）',
@@ -128,6 +129,13 @@ export default {
     title: 'Claude Code',
     enableLabel: 'エディタに表示',
     enableDesc: 'ノートのツールバーに、修正・言い換え・要約・続きを書くのClaudeボタンを追加します。',
+    modelLabel: 'モデル',
+    modelDesc: 'Sonnetは高速で編集には十分です。Opusは遅いものの、長文や複雑な文章に強いです。',
+    models: {
+      sonnet: 'Sonnet（推奨）',
+      opus: 'Opus',
+      haiku: 'Haiku（最速）'
+    },
     statusLabel: 'コマンドラインツール',
     statusDesc: 'RustNotesはこのMacにインストール済みのClaude Code CLIを使用します。アプリにAPIキーは保存されません。',
     recheck: '再確認',

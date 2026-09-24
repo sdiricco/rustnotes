@@ -203,6 +203,22 @@
                     <span class="switch-thumb"></span>
                   </button>
                 </div>
+                <div class="row" :class="{ 'is-disabled': !settings.claudeEnabled }">
+                  <div class="row-text">
+                    <span class="row-label">{{ t('settings.claude.modelLabel') }}</span>
+                    <span class="row-desc">{{ t('settings.claude.modelDesc') }}</span>
+                  </div>
+                  <Select
+                    :model-value="settings.claudeModel"
+                    :options="claudeModelOptions"
+                    option-label="label"
+                    option-value="value"
+                    size="small"
+                    class="settings-select"
+                    :disabled="!settings.claudeEnabled"
+                    @update:model-value="settings.setClaudeModel($event)"
+                  />
+                </div>
                 <div class="row">
                   <div class="row-text">
                     <span class="row-label">{{ t('settings.claude.statusLabel') }}</span>
@@ -572,6 +588,10 @@ const claudeText = ref('')
 const claudeReply = ref(null)
 const claudeBusy = ref(false)
 
+const claudeModelOptions = computed(() =>
+  ['sonnet', 'opus', 'haiku'].map((value) => ({ value, label: t(`settings.claude.models.${value}`) }))
+)
+
 const claudeStatusIcon = computed(() => {
   if (!claude.found) return 'lucide:circle-x'
   if (!claude.ready) return 'lucide:circle-alert'
@@ -719,6 +739,7 @@ const shortcutGroups = computed(() => [
       { label: t('settings.shortcuts.general.duplicateNote'), keys: [MOD, 'D'] },
       { label: t('settings.shortcuts.general.findInNote'), keys: [MOD, 'F'] },
       { label: t('settings.shortcuts.general.findInAllNotes'), keys: [MOD, SHIFT, 'F'] },
+      { label: t('settings.shortcuts.general.claude'), keys: [MOD, 'J'] },
       { label: t('settings.shortcuts.general.toggleSidebar'), keys: [MOD, '/'] },
       { label: t('settings.shortcuts.general.settings'), keys: [MOD, ','] },
       { label: t('settings.shortcuts.general.zoomIn'), keys: [MOD, '+'] },

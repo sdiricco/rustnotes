@@ -144,6 +144,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(claude::Running::default())
+        .manage(claude::Warm::default())
         .setup(|app| {
             let handle = app.handle().clone();
             match store::migrate_legacy(&handle) {
@@ -223,8 +224,15 @@ pub fn run() {
             claude::claude_login,
             claude::claude_run,
             claude::claude_stream,
+            claude::claude_prewarm,
             claude::claude_cancel,
         ])
-        .run(tauri::generate_context!())
-        .expect("errore durante l'avvio dell'applicazione Tauri");
+        .build(tauri::generate_context!())
+        .expect("errore durante l'avvio dell'applicazione Tauri")
+        .run(|app, event| {
+            // Processi `claude` (pre avviato o in corso) chiusi con l'app.
+            if let tauri::RunEvent::Exit = event {
+                claude::shutdown(&app.state::<claude::Warm>(), &app.state::<claude::Running>());
+            }
+        });
 }

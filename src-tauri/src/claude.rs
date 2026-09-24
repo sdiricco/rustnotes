@@ -21,7 +21,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_opener::OpenerExt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
 /// Tempo massimo per una risposta. Un testo lungo da riformulare puo'
 /// richiedere piu' di un minuto; oltre tre e' quasi certamente un blocco.
@@ -41,6 +41,26 @@ Write in the same language as the input text unless the instruction asks otherwi
 /// annullamento. Registrato come stato Tauri in lib.rs.
 #[derive(Default)]
 pub struct Running(pub Mutex<HashMap<String, Child>>);
+
+/// Un processo gia' avviato e in attesa del messaggio su stdin: paga in
+/// anticipo l'avvio di Node e l'inizializzazione della CLI (circa 2,4 s),
+/// cosi' la richiesta successiva parte subito. Uno solo, per il modello
+/// scelto; usato una volta e poi riavviato dal frontend (claude_prewarm).
+#[derive(Default)]
+pub struct Warm(pub Mutex<Option<Spawned>>);
+
+pub struct Spawned {
+    pub model: String,
+    pub child: Child,
+    pub stdin: Option<ChildStdin>,
+    pub stdout: Option<ChildStdout>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct EndEvent<'a> {
+    request_id: &'a str,
+}
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -261,62 +281,147 @@ pub fn parse_result(stdout: &str) -> Result<ClaudeReply, ClaudeError> {
     })
 }
 
-/// Manda `instruction` + `text` a Claude e ritorna il solo testo di risposta.
-///
-/// Legge l'output in streaming (`stream-json`): ogni frammento di testo viene
-/// passato a `on_delta` mentre arriva, la riga finale `result` e' la stessa
-/// del formato json e da' testo completo, costo e durata. Con `registry` e
-/// `request_id` il processo resta annullabile da `cancel`.
-pub async fn run(
-    instruction: &str,
-    text: &str,
-    registry: Option<(&Running, &str)>,
-    mut on_delta: impl FnMut(&str),
-) -> Result<ClaudeReply, ClaudeError> {
-    let bin = find_binary()
-        .await
-        .ok_or_else(|| ClaudeError::new("not-found", "claude binary not found"))?;
-
-    let mut child = base_command(&bin)
-        .args([
-            "-p",
-            "--output-format",
-            "stream-json",
-            "--verbose",
-            "--include-partial-messages",
-            // Solo testo: niente Bash, niente lettura o scrittura di file.
-            "--tools",
-            "",
-            // Nessun server MCP dell'utente: rallenterebbero l'avvio e non
-            // servono.
-            "--strict-mcp-config",
-            // Niente hook o permessi dalle impostazioni utente/progetto.
-            "--setting-sources",
-            "",
-            "--no-session-persistence",
-            "--system-prompt",
-            SYSTEM_PROMPT,
-        ])
+/// Avvia `claude -p` in modalita' stream-json su entrambi i lati: il
+/// messaggio dell'utente arriva come JSON su stdin, cosi' lo stesso processo
+/// puo' essere avviato prima e alimentato dopo (vedi `Warm`).
+fn spawn_cli(bin: &Path, model: &str) -> Result<Spawned, ClaudeError> {
+    let mut cmd = base_command(bin);
+    cmd.args([
+        "-p",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--include-partial-messages",
+        // Solo testo: niente Bash, niente lettura o scrittura di file.
+        "--tools",
+        "",
+        // Nessun server MCP dell'utente: rallenterebbero l'avvio e non
+        // servono.
+        "--strict-mcp-config",
+        // Niente hook o permessi dalle impostazioni utente/progetto.
+        "--setting-sources",
+        "",
+        "--no-session-persistence",
+        "--system-prompt",
+        SYSTEM_PROMPT,
+    ]);
+    if !model.is_empty() {
+        cmd.args(["--model", model]);
+    }
+    let mut child = cmd
         .stdin(Stdio::piped())
         .spawn()
         .map_err(|e| ClaudeError::new("spawn-failed", e.to_string()))?;
+    let stdin = child.stdin.take();
+    let stdout = child.stdout.take();
+    Ok(Spawned {
+        model: model.to_string(),
+        child,
+        stdin,
+        stdout,
+    })
+}
 
-    // Tutto via stdin, senza prompt posizionale: cosi' il testo dell'utente
-    // non passa per la riga di comando (limiti di lunghezza, ps).
-    if let Some(mut stdin) = child.stdin.take() {
-        let input = format!("{instruction}\n\n---\n\n{text}");
+/// Prende il processo pre avviato se c'e', e' vivo e ha il modello giusto;
+/// altrimenti lo scarta (verra' raccolto in background).
+fn take_warm(warm: Option<&Warm>, model: &str) -> Option<Spawned> {
+    let mut slot = warm?.0.lock().unwrap();
+    let mut sp = slot.take()?;
+    let alive = matches!(sp.child.try_wait(), Ok(None));
+    if alive && sp.model == model {
+        return Some(sp);
+    }
+    let _ = sp.child.start_kill();
+    tauri::async_runtime::spawn(async move {
+        let _ = sp.child.wait().await;
+    });
+    None
+}
+
+/// Avvia (o rimpiazza) il processo in attesa per `model`.
+pub async fn prewarm(warm: &Warm, model: &str) -> Result<(), ClaudeError> {
+    {
+        let mut slot = warm.0.lock().unwrap();
+        if let Some(sp) = slot.as_mut() {
+            if sp.model == model && matches!(sp.child.try_wait(), Ok(None)) {
+                return Ok(());
+            }
+            if let Some(mut old) = slot.take() {
+                let _ = old.child.start_kill();
+                tauri::async_runtime::spawn(async move {
+                    let _ = old.child.wait().await;
+                });
+            }
+        }
+    }
+    let bin = find_binary()
+        .await
+        .ok_or_else(|| ClaudeError::new("not-found", "claude binary not found"))?;
+    let sp = spawn_cli(&bin, model)?;
+    *warm.0.lock().unwrap() = Some(sp);
+    Ok(())
+}
+
+/// All'uscita dell'app: niente processi Node orfani.
+pub fn shutdown(warm: &Warm, running: &Running) {
+    if let Some(mut sp) = warm.0.lock().unwrap().take() {
+        let _ = sp.child.start_kill();
+    }
+    for (_, mut child) in running.0.lock().unwrap().drain() {
+        let _ = child.start_kill();
+    }
+}
+
+/// Manda `instruction` + `text` a Claude e ritorna il solo testo di risposta.
+///
+/// Ogni frammento di testo passa a `on_delta` mentre arriva; `on_end` scatta
+/// a `message_stop`, quando il testo e' completo ma la CLI deve ancora
+/// chiudere il turno (circa un secondo): il frontend puo' gia' abilitare i
+/// pulsanti. La riga finale `result` da' testo completo, costo e durata.
+/// Con `registry` e `request_id` il processo resta annullabile da `cancel`.
+pub async fn run(
+    instruction: &str,
+    text: &str,
+    model: &str,
+    warm: Option<&Warm>,
+    registry: Option<(&Running, &str)>,
+    mut on_delta: impl FnMut(&str),
+    mut on_end: impl FnMut(),
+) -> Result<ClaudeReply, ClaudeError> {
+    let mut sp = match take_warm(warm, model) {
+        Some(sp) => sp,
+        None => {
+            let bin = find_binary()
+                .await
+                .ok_or_else(|| ClaudeError::new("not-found", "claude binary not found"))?;
+            spawn_cli(&bin, model)?
+        }
+    };
+
+    // Messaggio come JSON su stdin, poi EOF: la CLI risponde e termina.
+    // Il testo dell'utente non passa dalla riga di comando.
+    let content = format!("{instruction}\n\n---\n\n{text}");
+    let message = serde_json::json!({
+        "type": "user",
+        "message": { "role": "user", "content": content }
+    });
+    if let Some(mut stdin) = sp.stdin.take() {
+        let mut line = message.to_string();
+        line.push('\n');
         stdin
-            .write_all(input.as_bytes())
+            .write_all(line.as_bytes())
             .await
             .map_err(|e| ClaudeError::new("spawn-failed", e.to_string()))?;
-        // drop chiude stdin: la CLI legge fino a EOF.
+        // drop chiude stdin.
     }
-
-    let stdout = child
+    let stdout = sp
         .stdout
         .take()
         .ok_or_else(|| ClaudeError::new("spawn-failed", "no stdout"))?;
-    let mut stderr = child.stderr.take();
+    let mut stderr = sp.child.stderr.take();
+    let child = sp.child;
 
     // Il figlio va nel registro solo dopo aver preso stdout/stderr: da qui in
     // avanti `cancel` puo' ucciderlo e la lettura termina per EOF.
@@ -340,15 +445,17 @@ pub async fn run(
         while let Ok(Some(line)) = lines.next_line().await {
             let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
             match v.get("type").and_then(Value::as_str) {
-                Some("stream_event") => {
-                    if let Some(t) = v
-                        .pointer("/event/delta/text")
-                        .and_then(Value::as_str)
-                        .filter(|_| v.pointer("/event/delta/type").and_then(Value::as_str) == Some("text_delta"))
-                    {
-                        on_delta(t);
+                Some("stream_event") => match v.pointer("/event/type").and_then(Value::as_str) {
+                    Some("content_block_delta") => {
+                        if v.pointer("/event/delta/type").and_then(Value::as_str) == Some("text_delta") {
+                            if let Some(t) = v.pointer("/event/delta/text").and_then(Value::as_str) {
+                                on_delta(t);
+                            }
+                        }
                     }
-                }
+                    Some("message_stop") => on_end(),
+                    _ => {}
+                },
                 Some("result") => result_line = Some(line),
                 _ => {}
             }
@@ -453,33 +560,64 @@ pub async fn claude_login(app: AppHandle, done_message: String) -> Result<(), Cl
 }
 
 #[tauri::command]
-pub async fn claude_run(instruction: String, text: String) -> Result<ClaudeReply, ClaudeError> {
-    let res = run(&instruction, &text, None, |_| {}).await;
+pub async fn claude_run(
+    instruction: String,
+    text: String,
+    model: Option<String>,
+) -> Result<ClaudeReply, ClaudeError> {
+    let res = run(&instruction, &text, model.as_deref().unwrap_or(""), None, None, |_| {}, || {}).await;
     log_run(&res);
     res
 }
 
 /// Come `claude_run`, ma ogni frammento arriva al frontend come evento
-/// `claude:delta` con `requestId`, e la richiesta e' annullabile.
+/// `claude:delta` con `requestId`, `claude:end` segna la fine del testo, e
+/// la richiesta e' annullabile. Usa il processo pre avviato se c'e'.
 #[tauri::command]
 pub async fn claude_stream(
     app: AppHandle,
     running: State<'_, Running>,
+    warm: State<'_, Warm>,
     request_id: String,
     instruction: String,
     text: String,
+    model: Option<String>,
 ) -> Result<ClaudeReply, ClaudeError> {
-    let res = run(&instruction, &text, Some((&running, &request_id)), |t| {
-        let _ = app.emit(
-            "claude:delta",
-            DeltaEvent {
-                request_id: &request_id,
-                text: t,
-            },
-        );
-    })
+    let res = run(
+        &instruction,
+        &text,
+        model.as_deref().unwrap_or(""),
+        Some(&warm),
+        Some((&running, &request_id)),
+        |t| {
+            let _ = app.emit(
+                "claude:delta",
+                DeltaEvent {
+                    request_id: &request_id,
+                    text: t,
+                },
+            );
+        },
+        || {
+            let _ = app.emit(
+                "claude:end",
+                EndEvent {
+                    request_id: &request_id,
+                },
+            );
+        },
+    )
     .await;
     log_run(&res);
+    res
+}
+
+#[tauri::command]
+pub async fn claude_prewarm(warm: State<'_, Warm>, model: Option<String>) -> Result<(), ClaudeError> {
+    let res = prewarm(&warm, model.as_deref().unwrap_or("")).await;
+    if let Err(e) = &res {
+        eprintln!("[rustnotes] claude_prewarm ERRORE {}: {}", e.code, e.message);
+    }
     res
 }
 

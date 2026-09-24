@@ -30,32 +30,6 @@
                  CLI di Claude Code e' installata e l'utente non l'ha nascosta
                  in Impostazioni. Il menu dice su cosa agisce (selezione o
                  nota) e, se manca l'accesso, rimanda a Impostazioni. -->
-            <div v-if="claudeVisible" ref="claudeMenuEl" class="action-overflow">
-              <button
-                class="icon-btn"
-                :class="{ active: claudeMenuOpen }"
-                :title="t('editor.claude.menu')"
-                :disabled="Boolean(claudeRun)"
-                @click="openClaudeMenu"
-              >
-                <Icon icon="lucide:sparkles" />
-              </button>
-              <div v-if="claudeMenuOpen" class="action-overflow-menu claude-menu">
-                <div class="claude-menu-scope">
-                  {{ t(claudeScopeIsSelection ? 'editor.claude.onSelection' : 'editor.claude.onNote') }}
-                </div>
-                <template v-if="claude.ready">
-                  <button v-for="a in CLAUDE_ACTIONS" :key="a.id" @click="startClaude(a)">
-                    <Icon :icon="a.icon" />
-                    <span>{{ t(`editor.claude.actions.${a.id}`) }}</span>
-                  </button>
-                </template>
-                <button v-else @click="ui.openSettings('claude'); claudeMenuOpen = false">
-                  <Icon icon="lucide:log-in" />
-                  <span>{{ t('editor.claude.signInHint') }}</span>
-                </button>
-              </div>
-            </div>
             <button class="icon-btn" :title="t('editor.findInNote', { shortcut: shortcut('mod+F') })" @click="quillEditorRef?.toggleFindBar()">
               <Icon icon="lucide:search" />
             </button>
@@ -113,20 +87,38 @@
         :toolbar-container="quillToolbarEl"
         class="editor-body"
         @change="onContentChange"
+        @claude="toggleAssistant"
+        @selection="onEditorSelection"
       />
 
-      <ClaudePanel
-        :visible="Boolean(claudeRun)"
-        :action="claudeRun?.action"
-        :on-selection="Boolean(claudeRun?.range)"
-        :text="claudeRun?.text || ''"
-        :streaming="Boolean(claudeRun?.streaming)"
-        :reply="claudeRun?.reply"
-        :error="claudeRun?.error || ''"
+      <!-- Assistente Claude: pulsante fisso in basso a destra, come un widget
+           di assistenza; il pannello si apre sopra di lui (ClaudeAssistant).
+           C'e' solo se la CLI di Claude Code e' installata e la funzione e'
+           accesa in Impostazioni. -->
+      <button
+        v-if="claudeVisible"
+        class="claude-fab"
+        :class="{ open: Boolean(assistant) }"
+        :title="`${t('editor.claude.menu')} (${shortcut('mod+J')})`"
+        @click="toggleAssistant"
+      >
+        <Icon :icon="assistant ? 'lucide:x' : 'lucide:sparkles'" />
+      </button>
+
+      <ClaudeAssistant
+        :open="Boolean(assistant)"
+        :on-selection="Boolean(assistant?.range)"
+        :ready="claude.ready"
+        :run="claudeRun"
+        @action="(a) => startClaude(buildInstruction(a, assistant), { action: a, label: t(`editor.claude.actions.${a.id}`) })"
+        @ask="(q) => startClaude(buildFree(q, assistant), { action: null, label: q })"
+        @refine="refineClaude"
+        @retry="retryClaude"
         @replace="applyClaude('replace')"
         @insert="applyClaude('insert')"
         @copy="copyClaude"
-        @discard="discardClaude"
+        @close="closeAssistant"
+        @settings="ui.openSettings('claude'); closeAssistant()"
       />
 
       <Dialog
@@ -154,7 +146,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
@@ -164,11 +156,11 @@ import { useSettingsStore } from '../stores/settings'
 import { useUiStore } from '../stores/ui'
 import { useClaudeStore } from '../stores/claude'
 import QuillEditor from './QuillEditor.vue'
-import ClaudePanel from './ClaudePanel.vue'
+import ClaudeAssistant from './ClaudeAssistant.vue'
 import { htmlToMarkdown, markdownToHtml } from '../utils/markdown'
 import { api } from '../utils/api'
 import { isMac, shortcut } from '../utils/shortcuts'
-import { CLAUDE_ACTIONS, buildInstruction, stripOuterFence } from '../utils/claudeActions'
+import { buildInstruction, buildFree, buildFollowUp, stripOuterFence } from '../utils/claudeActions'
 
 const store = useNotesStore()
 const settings = useSettingsStore()
@@ -214,24 +206,22 @@ function onGlobalMousedown(event) {
   if (actionMenuOpen.value && actionOverflowEl.value && !actionOverflowEl.value.contains(event.target)) {
     actionMenuOpen.value = false
   }
-  if (claudeMenuOpen.value && claudeMenuEl.value && !claudeMenuEl.value.contains(event.target)) {
-    claudeMenuOpen.value = false
-  }
 }
 
 // ---------------------------------------------------------------------------
-// Claude. Il testo di partenza e' la selezione, o tutta la nota se non c'e';
-// viaggia come Markdown (una selezione dentro una sola riga come testo
-// piano). Il risultato arriva in streaming nel pannello e si applica solo su
-// richiesta, tramite gli helper esposti da QuillEditor.
+// Claude. All'apertura del popup (pulsante o ⌘J) si fissa il testo di
+// partenza: la selezione, o tutta la nota se non c'e'. Viaggia come Markdown
+// (una selezione dentro una sola riga come testo piano). Ogni richiesta
+// (azione rapida, istruzione libera, seguito) arriva in streaming nel popup e
+// si applica solo su richiesta, tramite gli helper esposti da QuillEditor.
 // ---------------------------------------------------------------------------
-const claudeMenuOpen = ref(false)
-const claudeMenuEl = ref(null)
-// Richiesta in corso o in anteprima: { id, action, range, inline, text,
-// streaming, reply, error }. null = pannello chiuso.
+// Pannello aperto: { range, inline, source }. null = chiuso. Finche' non
+// c'e' una richiesta, lo scope segue la selezione dal vivo (onEditorSelection);
+// alla prima richiesta si congela.
+const assistant = ref(null)
+// Richiesta corrente o ultima proposta: { id, action, label, instruction,
+// original, text, streaming, reply, error }. null = nessuna ancora.
 const claudeRun = ref(null)
-// Aggiornato quando si apre il menu: la selezione non e' reattiva.
-const claudeScopeIsSelection = ref(false)
 
 const claudeVisible = computed(() => settings.claudeEnabled && claude.found)
 
@@ -239,9 +229,49 @@ onMounted(() => {
   if (settings.claudeEnabled) claude.ensure()
 })
 
-function openClaudeMenu() {
-  claudeScopeIsSelection.value = Boolean(quillEditorRef.value?.getRange())
-  claudeMenuOpen.value = !claudeMenuOpen.value
+// Cambio nota: il pannello si riferiva a un'altra nota.
+watch(() => store.selectedNote?.id, () => closeAssistant())
+
+// Testo di partenza per `range` (null = tutta la nota): { range, inline, source }.
+function claudeScope(range) {
+  const editor = quillEditorRef.value
+  const inline = Boolean(range) && !editor.getPlainText(range).includes('\n')
+  const source = range
+    ? inline
+      ? editor.getPlainText(range)
+      : editor.getMarkdown(range)
+    : htmlToMarkdown(store.selectedNote.content)
+  return { range, inline, source }
+}
+
+function openAssistant() {
+  const editor = quillEditorRef.value
+  if (!editor || !claudeVisible.value) return
+  const scope = claudeScope(editor.getRange())
+  claudeRun.value = null
+  editor.markRange(scope.range)
+  assistant.value = scope
+}
+
+function toggleAssistant() {
+  if (assistant.value) closeAssistant()
+  else openAssistant()
+}
+
+function onEditorSelection(range) {
+  if (!assistant.value || claudeRun.value) return
+  const scope = claudeScope(range)
+  quillEditorRef.value?.markRange(scope.range)
+  assistant.value = scope
+}
+
+function closeAssistant() {
+  if (!assistant.value) return
+  const run = claudeRun.value
+  if (run?.streaming) claude.cancel(run.id)
+  claudeRun.value = null
+  quillEditorRef.value?.unmarkRange()
+  assistant.value = null
 }
 
 const CLAUDE_ERRORS = {
@@ -250,31 +280,25 @@ const CLAUDE_ERRORS = {
   timeout: 'settings.claude.errTimeout'
 }
 
-async function startClaude(action) {
-  claudeMenuOpen.value = false
-  const editor = quillEditorRef.value
-  if (!editor) return
-  const range = editor.getRange()
-  const inline = Boolean(range) && !editor.getPlainText(range).includes('\n')
-  const source = range
-    ? inline
-      ? editor.getPlainText(range)
-      : editor.getMarkdown(range)
-    : htmlToMarkdown(store.selectedNote.content)
-  if (!source.trim()) {
+// Una richiesta: `instruction` e' gia' completa (buildInstruction /
+// buildFree / buildFollowUp), il testo e' sempre la partenza fissata
+// all'apertura. Una nuova richiesta scarta la proposta precedente.
+async function startClaude(instruction, { action, label }) {
+  const ctx = assistant.value
+  if (!ctx) return
+  if (!ctx.source.trim()) {
     toast.add({ severity: 'warn', summary: t('editor.claude.emptyNote'), life: 2500 })
     return
   }
-
-  // reactive() e non oggetto piano: lo si muta da qui (frammenti, fine,
-  // errore) e il pannello deve vederlo. Un oggetto piano dentro claudeRun
-  // sarebbe un proxy diverso da `run`, e le scritture su `run` resterebbero
-  // invisibili (e il confronto claudeRun.value === run fallirebbe).
+  if (claudeRun.value?.streaming) claude.cancel(claudeRun.value.id)
+  // reactive() e non oggetto piano: lo si muta da qui e il popup deve
+  // vederlo (un oggetto piano dentro la ref sarebbe un proxy diverso).
   const run = reactive({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     action,
-    range,
-    inline,
+    label,
+    instruction,
+    original: ctx.source,
     text: '',
     streaming: true,
     reply: null,
@@ -282,8 +306,18 @@ async function startClaude(action) {
   })
   claudeRun.value = run
   try {
-    const reply = await claude.run(run.id, buildInstruction(action, { inline }), source, (delta) => {
-      if (claudeRun.value === run) run.text += delta
+    const reply = await claude.run(run.id, instruction, ctx.source, {
+      onDelta: (delta) => {
+        if (claudeRun.value === run) run.text += delta
+      },
+      // Testo completo: i pulsanti si abilitano subito, il riepilogo
+      // (durata, costo) arriva circa un secondo dopo.
+      onEnd: () => {
+        if (claudeRun.value === run) {
+          run.text = stripOuterFence(run.text)
+          run.streaming = false
+        }
+      }
     })
     if (claudeRun.value !== run) return
     run.text = stripOuterFence(reply.text)
@@ -297,17 +331,32 @@ async function startClaude(action) {
   }
 }
 
+function refineClaude(refinement) {
+  const prev = claudeRun.value
+  if (!prev?.text || !assistant.value) return
+  startClaude(buildFollowUp(refinement, prev.text, assistant.value), { action: prev.action, label: refinement })
+}
+
+function retryClaude() {
+  const prev = claudeRun.value
+  if (!prev) return
+  startClaude(prev.instruction, { action: prev.action, label: prev.label })
+}
+
 function applyClaude(mode) {
   const run = claudeRun.value
   const editor = quillEditorRef.value
-  if (!run || !editor || run.streaming || !run.text) return
+  const ctx = assistant.value
+  if (!run || !editor || !ctx || run.streaming || !run.text) return
   // Testo piano solo se la partenza era una riga e la risposta pure:
   // un riassunto a punti di una frase resta Markdown e va a capo.
-  const plain = run.inline && !run.text.includes('\n')
+  const plain = ctx.inline && !run.text.includes('\n')
   const content = plain ? { text: run.text } : { markdown: run.text }
-  if (mode === 'replace') editor.replaceRange(run.range, content)
-  else editor.insertAfter(run.range, content)
+  editor.unmarkRange()
+  if (mode === 'replace') editor.replaceRange(ctx.range, content)
+  else editor.insertAfter(ctx.range, content)
   claudeRun.value = null
+  assistant.value = null
   toast.add({ severity: 'success', summary: t('editor.claude.applied'), life: 1800 })
 }
 
@@ -315,13 +364,6 @@ async function copyClaude() {
   if (!claudeRun.value?.text) return
   await navigator.clipboard.writeText(claudeRun.value.text)
   toast.add({ severity: 'success', summary: t('editor.claude.copiedToast'), life: 1800 })
-}
-
-function discardClaude() {
-  const run = claudeRun.value
-  if (!run) return
-  if (run.streaming) claude.cancel(run.id)
-  claudeRun.value = null
 }
 
 // Il trascinamento della finestra ora e' tutto nell'header globale
@@ -476,12 +518,35 @@ async function copyNote() {
   flex-shrink: 0;
 }
 
-.claude-menu-scope {
-  font-size: 11px;
-  color: var(--p-text-muted-color);
-  padding: 5px 10px 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.note-editor {
+  position: relative;
+}
+.claude-fab {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 5;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #7c5cff;
+  color: #fff;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(124, 92, 255, 0.35);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.claude-fab:hover {
+  transform: scale(1.06);
+}
+.claude-fab.open {
+  background: var(--p-text-color);
+  color: var(--editor-bg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
 .icon-btn.active {
   background: var(--sidebar-hover-bg);

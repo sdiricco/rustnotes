@@ -70,7 +70,8 @@ export default {
       settings: 'Impostazioni',
       zoomIn: 'Ingrandisci',
       zoomOut: 'Riduci',
-      zoomReset: 'Dimensione effettiva'
+      zoomReset: 'Dimensione effettiva',
+      claude: 'Assistente Claude'
     },
     formatting: {
       title: 'Formattazione (nell’editor)',
@@ -128,6 +129,13 @@ export default {
     title: 'Claude Code',
     enableLabel: 'Mostra nell\'editor',
     enableDesc: 'Aggiunge alla barra della nota un pulsante Claude con correggi, riformula, riassumi e continua.',
+    modelLabel: 'Modello',
+    modelDesc: 'Sonnet è veloce e basta per correggere e riscrivere; Opus è più lento e più forte su testi lunghi o complessi.',
+    models: {
+      sonnet: 'Sonnet (consigliato)',
+      opus: 'Opus',
+      haiku: 'Haiku (il più veloce)'
+    },
     statusLabel: 'Strumento a riga di comando',
     statusDesc: 'RustNotes usa la CLI di Claude Code già installata su questo Mac. Nessuna chiave API viene salvata nell\'app.',
     recheck: 'Ricontrolla',

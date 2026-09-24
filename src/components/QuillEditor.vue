@@ -265,7 +265,7 @@ const props = defineProps({
   toolbarContainer: { type: Object, default: null },
 })
 
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'claude', 'selection'])
 
 const editorEl = ref(null)
 let quill = null
@@ -286,6 +286,13 @@ SearchHighlightActiveBlot.tagName = 'mark'
 SearchHighlightActiveBlot.className = 'ql-search-highlight-active'
 Quill.register(SearchHighlightBlot, true)
 Quill.register(SearchHighlightActiveBlot, true)
+// Porzione su cui lavora il popup Claude, evidenziata finche' e' aperto.
+// Stessa tecnica della ricerca: formato 'silent', non salvato.
+class ClaudeHighlightBlot extends InlineBlot {}
+ClaudeHighlightBlot.blotName = 'claude-highlight'
+ClaudeHighlightBlot.tagName = 'mark'
+ClaudeHighlightBlot.className = 'ql-claude-highlight'
+Quill.register(ClaudeHighlightBlot, true)
 // Incolla dall'esterno senza colori di testo/sfondo della sorgente (vedi
 // utils/quillClipboard.js): sostituisce il modulo clipboard di default.
 Quill.register('modules/clipboard', RustNotesClipboard, true)
@@ -1127,6 +1134,8 @@ function closeFindBar() {
 
 const editorBindings = {
   findInNote: { key: 70, shortKey: true, handler() { openFindBar(); return false } },
+  // ⌘J: popup Claude sulla selezione (o sulla nota). Lo gestisce NoteEditor.
+  claude: { key: 74, shortKey: true, handler() { emit('claude'); return false } },
   strike: { key: 88, shortKey: true, shiftKey: true, handler(r, c) { toggle(this.quill, r, 'strike', true, c.format.strike); return false } },
   code: { key: 69, shortKey: true, handler(r, c) { toggle(this.quill, r, 'code', true, c.format.code); return false } },
   h1: { key: 49, shortKey: true, altKey: true, handler(r, c) { toggle(this.quill, r, 'header', 1, c.format.header); return false } },
@@ -1504,6 +1513,12 @@ onMounted(async () => {
   })
 
   quill.on('editor-change', syncColorIndicators)
+  // Per il pannello Claude: la selezione corrente ({index, length}), solo
+  // quando c'e' — null significa che l'editor ha perso il fuoco (per esempio
+  // per scrivere nel pannello stesso), e non va letto come "niente selezionato".
+  quill.on('selection-change', (range) => {
+    if (range) emit('selection', range.length ? { index: range.index, length: range.length } : null)
+  })
 })
 
 function applySpellcheck() {
@@ -1613,7 +1628,30 @@ function insertAfter(range, { text, markdown }) {
   quill.setSelection(index, len, 'user')
 }
 
-defineExpose({ focusEditor, toggleFindBar, getRange, getPlainText, getMarkdown, replaceRange, insertAfter })
+let markedRange = null
+function markRange(range) {
+  unmarkRange()
+  if (!range) return
+  markedRange = range
+  quill.formatText(range.index, range.length, 'claude-highlight', true, 'silent')
+}
+function unmarkRange() {
+  if (!markedRange) return
+  quill.formatText(markedRange.index, markedRange.length, 'claude-highlight', false, 'silent')
+  markedRange = null
+}
+
+defineExpose({
+  focusEditor,
+  toggleFindBar,
+  getRange,
+  getPlainText,
+  getMarkdown,
+  replaceRange,
+  insertAfter,
+  markRange,
+  unmarkRange
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousedown', onGlobalMousedown)
@@ -1714,6 +1752,11 @@ onBeforeUnmount(() => {
 .find-bar button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+.quill-editor :deep(.ql-claude-highlight) {
+  background: rgba(124, 92, 255, 0.18);
+  color: inherit;
+  border-radius: 2px;
 }
 .quill-editor :deep(.ql-search-highlight) {
   background: rgba(255, 197, 23, 0.35);

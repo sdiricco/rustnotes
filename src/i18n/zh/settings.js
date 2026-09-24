@@ -70,7 +70,8 @@ export default {
       settings: '设置',
       zoomIn: '放大',
       zoomOut: '缩小',
-      zoomReset: '实际大小'
+      zoomReset: '实际大小',
+      claude: 'Claude 助手'
     },
     formatting: {
       title: '格式（编辑器内）',
@@ -128,6 +129,13 @@ export default {
     title: 'Claude Code',
     enableLabel: '在编辑器中显示',
     enableDesc: '在笔记工具栏添加 Claude 按钮，提供修正、改写、总结和续写。',
+    modelLabel: '模型',
+    modelDesc: 'Sonnet 速度快，足以胜任修改和改写；Opus 较慢，但在长文或复杂文本上更强。',
+    models: {
+      sonnet: 'Sonnet（推荐）',
+      opus: 'Opus',
+      haiku: 'Haiku（最快）'
+    },
     statusLabel: '命令行工具',
     statusDesc: 'RustNotes 使用这台 Mac 上已安装的 Claude Code 命令行工具。应用中不保存任何 API 密钥。',
     recheck: '重新检查',

@@ -46,6 +46,7 @@ export const useSettingsStore = defineStore('settings', {
     spellLang: 'it', // lingua della correzione quando attiva
     language: 'system', // 'system' | 'en' | 'it' — lingua dell'interfaccia
     claudeEnabled: true, // azioni Claude nell'editor (visibili solo se la CLI c'e')
+    claudeModel: 'sonnet', // 'sonnet' | 'opus' | 'haiku' — alias accettati dalla CLI
     ...loadSaved()
   }),
 
@@ -107,6 +108,11 @@ export const useSettingsStore = defineStore('settings', {
       this.save()
     },
 
+    setClaudeModel(model) {
+      this.claudeModel = model
+      this.save()
+    },
+
     toggleClaude() {
       this.claudeEnabled = !this.claudeEnabled
       this.save()
@@ -134,7 +140,8 @@ export const useSettingsStore = defineStore('settings', {
           spellcheck: this.spellcheck,
           spellLang: this.spellLang,
           language: this.language,
-          claudeEnabled: this.claudeEnabled
+          claudeEnabled: this.claudeEnabled,
+          claudeModel: this.claudeModel
         })
       )
     }

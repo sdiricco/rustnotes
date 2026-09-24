@@ -97,10 +97,15 @@ export const api = {
   claudeStatus: () => invoke('claude_status'),
   // Apre Terminal con `claude auth login`; la riga finale e' tradotta qui.
   claudeLogin: () => invoke('claude_login', { doneMessage: t('settings.claude.loginDone') }),
-  claudeRun: (instruction, text) => invoke('claude_run', { instruction, text }),
+  claudeRun: (instruction, text, model) => invoke('claude_run', { instruction, text, model }),
   // Variante in streaming: i frammenti arrivano su onClaudeDelta come
-  // { requestId, text }; la promise si risolve col testo completo alla fine.
-  claudeStream: (requestId, instruction, text) => invoke('claude_stream', { requestId, instruction, text }),
+  // { requestId, text }, onClaudeEnd segna la fine del testo (la promise si
+  // risolve col riepilogo circa un secondo dopo). Usa il processo pre
+  // avviato da claudePrewarm se c'e'.
+  claudeStream: (requestId, instruction, text, model) =>
+    invoke('claude_stream', { requestId, instruction, text, model }),
   claudeCancel: (requestId) => invoke('claude_cancel', { requestId }),
+  claudePrewarm: (model) => invoke('claude_prewarm', { model }),
+  onClaudeEnd: (callback) => bridgeEvent('claude:end', callback),
   onClaudeDelta: (callback) => bridgeEvent('claude:delta', callback)
 }
