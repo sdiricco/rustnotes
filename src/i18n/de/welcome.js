@@ -7,6 +7,7 @@ export default {
   feature2: 'Notizen in Ordnern organisieren, Favoriten markieren, alles per Suche finden.',
   feature3: 'Markdown importieren und exportieren, eine Notiz oder alle auf einmal.',
   feature4: 'Sprache und Erscheinungsbild in den Einstellungen ändern; standardmäßig folgt die App dem System.',
+  feature5: 'Lassen Sie Claude eine Auswahl korrigieren, umformulieren oder zusammenfassen, mit Vorher/Nachher-Ansicht (optional, erfordert installiertes Claude Code).',
   tryTitle: 'Gleich ausprobieren',
   try1: 'Machen Sie aus dieser Zeile einen abgehakten Punkt, indem Sie auf das Kästchen klicken.',
   try2: 'Drücken Sie den Kurzbefehl für eine neue Notiz (siehe Einstellungen → Kurzbefehle).',

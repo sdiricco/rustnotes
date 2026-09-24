@@ -7,6 +7,7 @@ export default {
   feature2: 'Organize notes in folders, mark favorites, find anything with search.',
   feature3: 'Import and export Markdown, one note or all of them at once.',
   feature4: 'Switch language and theme in Settings; the app follows your system by default.',
+  feature5: 'Ask Claude to fix, rephrase or summarize a selection, with a before/after view (optional, needs Claude Code installed).',
   tryTitle: 'Try it now',
   try1: 'Turn this line into a checked item by clicking the box.',
   try2: 'Press the shortcut for a new note (see Settings → Shortcuts).',

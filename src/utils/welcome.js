@@ -16,7 +16,7 @@ export function buildWelcomeHtml() {
     `<h1>${escapeHtml(t('welcome.title'))}</h1>`,
     `<p>${escapeHtml(t('welcome.intro'))}</p>`,
     `<h2>${escapeHtml(t('welcome.featuresTitle'))}</h2>`,
-    list(['welcome.feature1', 'welcome.feature2', 'welcome.feature3', 'welcome.feature4'], 'bullet'),
+    list(['welcome.feature1', 'welcome.feature2', 'welcome.feature3', 'welcome.feature4', 'welcome.feature5'], 'bullet'),
     `<h2>${escapeHtml(t('welcome.tryTitle'))}</h2>`,
     list(['welcome.try1', 'welcome.try2', 'welcome.try3'], 'unchecked'),
     `<h2>${escapeHtml(t('welcome.dataTitle'))}</h2>`,

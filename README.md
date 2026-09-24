@@ -30,6 +30,7 @@ Free and open source (MIT), no account, no cloud, no telemetry: your notes are f
 - Zoom the whole interface in and out (View menu, Cmd/Ctrl + / - / 0), remembered across launches
 - Keyboard-first: every action has a shortcut (see Settings → Shortcuts)
 - Small: a Tauri v2 app, native webview, a few MB installed
+- Optional **Claude assistant**: fix, rephrase, summarize, continue or ask anything about a selection or the whole note, with a before/after diff. Runs through the [Claude Code](https://claude.com/claude-code) CLI already on your Mac, no API key in the app (see below)
 
 ## Install
 
@@ -92,7 +93,31 @@ To get everything out as plain Markdown: Settings → About → **Export all not
 It writes one `.md` file per note, one subfolder per folder.
 
 Nothing ever leaves your machine except one anonymous `GET` to the GitHub Releases
-API to check for a newer version.
+API to check for a newer version, and the text you explicitly send to the Claude
+assistant if you use it (next section).
+
+## Claude assistant (optional)
+
+RustNotes can hand a selection, or the whole note, to Claude: fix spelling and
+grammar, rephrase, summarize, continue writing, or type your own instruction
+("turn this into a bullet list", "translate to English"). The proposal streams
+into a panel in the bottom-right corner, with a **Proposal / Changes** view that
+shows a word-by-word before/after. Nothing touches the note until you press
+*Replace* or *Insert below*; one Undo reverts it. You can refine a proposal
+("shorter", "more formal") before applying it.
+
+There is no API key to paste and no account inside RustNotes. The app runs the
+[Claude Code](https://claude.com/claude-code) command-line tool that is already
+installed and signed in on your computer, with all of its tools disabled: it can
+only read the text you send and reply with text. Usage counts against your own
+Claude subscription. If Claude Code is not installed the button simply does not
+appear; if it is installed but not signed in, Settings → Claude has a *Sign in*
+button that opens Terminal with the login.
+
+Settings → Claude lets you hide the assistant, pick the model (Sonnet by
+default, Opus or Haiku) and test the connection. Shortcut: Cmd/Ctrl + J.
+Rich content goes through Markdown on its way to Claude and back, so on notes
+with images or tables prefer working on a selection.
 
 ## Known limitations
 

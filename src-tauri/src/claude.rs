@@ -118,8 +118,8 @@ fn known_dirs() -> Vec<PathBuf> {
     if let Ok(home) = std::env::var("HOME") {
         let home = PathBuf::from(home);
         for rel in [
-            ".local/bin",     // installer nativo (curl | sh)
-            ".claude/local",  // vecchio installer locale
+            ".local/bin",    // installer nativo (curl | sh)
+            ".claude/local", // vecchio installer locale
             ".npm-global/bin",
             ".bun/bin",
             ".volta/bin",
@@ -168,8 +168,7 @@ async fn ask_login_shell() -> Option<PathBuf> {
     stdout
         .lines()
         .map(str::trim)
-        .filter(|l| l.starts_with('/'))
-        .last()
+        .rfind(|l| l.starts_with('/'))
         .map(PathBuf::from)
         .filter(|p| is_executable(p))
 }
@@ -261,7 +260,11 @@ pub async fn status() -> ClaudeStatus {
 pub fn parse_result(stdout: &str) -> Result<ClaudeReply, ClaudeError> {
     let v: Value = serde_json::from_str(stdout.trim())
         .map_err(|e| ClaudeError::new("bad-output", format!("{e}: {}", stdout.trim())))?;
-    let result = v.get("result").and_then(Value::as_str).unwrap_or("").to_string();
+    let result = v
+        .get("result")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     if v.get("is_error").and_then(Value::as_bool).unwrap_or(false) {
         // Il messaggio di errore della CLI viaggia nel campo `result`.
         let code = if result.to_lowercase().contains("authenticate")
@@ -276,7 +279,10 @@ pub fn parse_result(stdout: &str) -> Result<ClaudeReply, ClaudeError> {
     }
     Ok(ClaudeReply {
         text: result,
-        cost_usd: v.get("total_cost_usd").and_then(Value::as_f64).unwrap_or(0.0),
+        cost_usd: v
+            .get("total_cost_usd")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0),
         duration_ms: v.get("duration_ms").and_then(Value::as_u64).unwrap_or(0),
     })
 }
@@ -432,23 +438,29 @@ pub async fn run(
         }
         None => fallback = Some(child),
     }
-    let take_back = |registry: Option<(&Running, &str)>, fallback: Option<Child>| -> Option<Child> {
-        match registry {
-            Some((reg, id)) => reg.0.lock().unwrap().remove(id),
-            None => fallback,
-        }
-    };
+    let take_back =
+        |registry: Option<(&Running, &str)>, fallback: Option<Child>| -> Option<Child> {
+            match registry {
+                Some((reg, id)) => reg.0.lock().unwrap().remove(id),
+                None => fallback,
+            }
+        };
 
     let mut lines = BufReader::new(stdout).lines();
     let mut result_line: Option<String> = None;
     let read = async {
         while let Ok(Some(line)) = lines.next_line().await {
-            let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+            let Ok(v) = serde_json::from_str::<Value>(&line) else {
+                continue;
+            };
             match v.get("type").and_then(Value::as_str) {
                 Some("stream_event") => match v.pointer("/event/type").and_then(Value::as_str) {
                     Some("content_block_delta") => {
-                        if v.pointer("/event/delta/type").and_then(Value::as_str) == Some("text_delta") {
-                            if let Some(t) = v.pointer("/event/delta/text").and_then(Value::as_str) {
+                        if v.pointer("/event/delta/type").and_then(Value::as_str)
+                            == Some("text_delta")
+                        {
+                            if let Some(t) = v.pointer("/event/delta/text").and_then(Value::as_str)
+                            {
                                 on_delta(t);
                             }
                         }
@@ -565,7 +577,16 @@ pub async fn claude_run(
     text: String,
     model: Option<String>,
 ) -> Result<ClaudeReply, ClaudeError> {
-    let res = run(&instruction, &text, model.as_deref().unwrap_or(""), None, None, |_| {}, || {}).await;
+    let res = run(
+        &instruction,
+        &text,
+        model.as_deref().unwrap_or(""),
+        None,
+        None,
+        |_| {},
+        || {},
+    )
+    .await;
     log_run(&res);
     res
 }
@@ -613,10 +634,16 @@ pub async fn claude_stream(
 }
 
 #[tauri::command]
-pub async fn claude_prewarm(warm: State<'_, Warm>, model: Option<String>) -> Result<(), ClaudeError> {
+pub async fn claude_prewarm(
+    warm: State<'_, Warm>,
+    model: Option<String>,
+) -> Result<(), ClaudeError> {
     let res = prewarm(&warm, model.as_deref().unwrap_or("")).await;
     if let Err(e) = &res {
-        eprintln!("[rustnotes] claude_prewarm ERRORE {}: {}", e.code, e.message);
+        eprintln!(
+            "[rustnotes] claude_prewarm ERRORE {}: {}",
+            e.code, e.message
+        );
     }
     res
 }

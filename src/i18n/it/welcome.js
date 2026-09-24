@@ -7,6 +7,7 @@ export default {
   feature2: 'Organizzare le note in cartelle, segnare i preferiti, trovare tutto con la ricerca.',
   feature3: 'Importare ed esportare Markdown, una nota o tutte insieme.',
   feature4: 'Cambiare lingua e tema nelle Impostazioni; di default l\'app segue il sistema.',
+  feature5: 'Chiedi a Claude di correggere, riformulare o riassumere una selezione, con il confronto prima/dopo (opzionale, richiede Claude Code installato).',
   tryTitle: 'Prova subito',
   try1: 'Trasforma questa riga in una voce spuntata cliccando la casella.',
   try2: 'Premi la scorciatoia per una nuova nota (vedi Impostazioni → Scorciatoie).',
