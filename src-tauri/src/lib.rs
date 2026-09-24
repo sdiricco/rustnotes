@@ -232,7 +232,10 @@ pub fn run() {
         .run(|app, event| {
             // Processi `claude` (pre avviato o in corso) chiusi con l'app.
             if let tauri::RunEvent::Exit = event {
-                claude::shutdown(&app.state::<claude::Warm>(), &app.state::<claude::Running>());
+                claude::shutdown(
+                    &app.state::<claude::Warm>(),
+                    &app.state::<claude::Running>(),
+                );
             }
         });
 }
