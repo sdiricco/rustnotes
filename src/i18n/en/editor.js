@@ -27,5 +27,27 @@ export default {
     ordered: 'Numbered',
     bullet: 'Bulleted',
     checklist: 'Checklist'
+  },
+  // Menu "Claude" nella barra della nota e pannello di anteprima (ClaudePanel).
+  claude: {
+    menu: 'Claude',
+    onSelection: 'On the selection',
+    onNote: 'On the whole note',
+    signInHint: 'Sign in to Claude Code in Settings…',
+    actions: {
+      fix: 'Fix spelling and grammar',
+      rephrase: 'Rephrase',
+      summarize: 'Summarize',
+      continue: 'Continue writing'
+    },
+    working: 'Claude is writing…',
+    meta: 'Done in {s} s',
+    cancel: 'Cancel',
+    discard: 'Discard',
+    insertBelow: 'Insert below',
+    replace: 'Replace',
+    applied: 'Applied. Undo with the usual shortcut.',
+    copiedToast: 'Copied',
+    emptyNote: 'The note is empty'
   }
 }

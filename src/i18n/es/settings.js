@@ -126,6 +126,8 @@ export default {
 
   claude: {
     title: 'Claude Code',
+    enableLabel: 'Mostrar en el editor',
+    enableDesc: 'Añade a la barra de la nota un botón Claude con corregir, reformular, resumir y continuar.',
     statusLabel: 'Herramienta de línea de comandos',
     statusDesc: 'RustNotes usa la CLI de Claude Code ya instalada en este Mac. No se guarda ninguna clave API en la app.',
     recheck: 'Comprobar de nuevo',

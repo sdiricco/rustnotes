@@ -190,12 +190,27 @@
               <div class="card">
                 <div class="row">
                   <div class="row-text">
+                    <span id="claude-enable-label" class="row-label">{{ t('settings.claude.enableLabel') }}</span>
+                    <span class="row-desc">{{ t('settings.claude.enableDesc') }}</span>
+                  </div>
+                  <button
+                    class="switch"
+                    role="switch"
+                    :aria-checked="settings.claudeEnabled"
+                    aria-labelledby="claude-enable-label"
+                    @click="settings.toggleClaude()"
+                  >
+                    <span class="switch-thumb"></span>
+                  </button>
+                </div>
+                <div class="row">
+                  <div class="row-text">
                     <span class="row-label">{{ t('settings.claude.statusLabel') }}</span>
                     <span class="row-desc">{{ t('settings.claude.statusDesc') }}</span>
                   </div>
                   <div class="btn-row">
                     <Button
-                      v-if="claude?.found && !claude.loggedIn"
+                      v-if="claude.found && !claude.ready"
                       :label="t('settings.claude.login')"
                       size="small"
                       @click="onClaudeLogin"
@@ -203,11 +218,11 @@
                       <template #icon><Icon icon="lucide:log-in" /></template>
                     </Button>
                     <Button
-                      :label="claudeChecking ? t('settings.claude.checking') : t('settings.claude.recheck')"
+                      :label="claude.checking ? t('settings.claude.checking') : t('settings.claude.recheck')"
                       severity="secondary"
                       outlined
                       size="small"
-                      :loading="claudeChecking"
+                      :loading="claude.checking"
                       @click="refreshClaude"
                     >
                       <template #icon><Icon icon="lucide:refresh-cw" /></template>
@@ -216,7 +231,7 @@
                 </div>
               </div>
               <div
-                v-if="claude && !claudeChecking"
+                v-if="claude.status && !claude.checking"
                 class="update-status"
                 :class="{ available: claude.found && claude.loggedIn }"
                 role="status"
@@ -225,18 +240,18 @@
                 <span v-if="!claude.found">
                   {{ t('settings.claude.notFound') }} · {{ t('settings.claude.notFoundHint') }}
                 </span>
-                <span v-else-if="!claude.loggedIn">
-                  {{ t('settings.claude.found', { version: claude.version || '?' }) }} ·
+                <span v-else-if="!claude.ready">
+                  {{ t('settings.claude.found', { version: claude.status.version || '?' }) }} ·
                   {{ t('settings.claude.notLoggedIn') }} · {{ t('settings.claude.notLoggedInHint') }}
                 </span>
                 <span v-else>
-                  {{ t('settings.claude.ready') }} · {{ t('settings.claude.found', { version: claude.version || '?' }) }}
-                  <code :title="claude.path">{{ claude.path }}</code>
+                  {{ t('settings.claude.ready') }} · {{ t('settings.claude.found', { version: claude.status.version || '?' }) }}
+                  <code :title="claude.status.path">{{ claude.status.path }}</code>
                 </span>
               </div>
             </section>
 
-            <section v-if="claude?.found" class="group">
+            <section v-if="claude.found" class="group">
               <div class="group-title">{{ t('settings.claude.testTitle') }}</div>
               <div class="card">
                 <div class="row row-stack">
@@ -430,6 +445,7 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settings'
 import { useUiStore } from '../stores/ui'
 import { useUpdateCheckStore } from '../stores/updateCheck'
+import { useClaudeStore } from '../stores/claude'
 import { useNotesStore } from '../stores/notes'
 import { useToast } from 'primevue/usetoast'
 import { ALT, MOD, SHIFT, isMac } from '../utils/shortcuts'
@@ -442,6 +458,7 @@ const { t } = useI18n()
 const settings = useSettingsStore()
 const ui = useUiStore()
 const updateCheck = useUpdateCheckStore()
+const claude = useClaudeStore()
 const notes = useNotesStore()
 const toast = useToast()
 const confirm = useConfirm()
@@ -546,37 +563,29 @@ const current = computed(
 const detailOpen = ref(false)
 const showingDetailOnNarrow = computed(() => ui.narrow && detailOpen.value)
 
-// Claude Code: stato della CLI letto da Rust quando si entra nella scheda
-// (non all'avvio: lancia due processi). La prova manda istruzione + testo
-// e mostra la risposta grezza, per verificare il giro senza toccare l'editor.
-const claude = ref(null)
-const claudeChecking = ref(false)
+// Claude Code: lo stato della CLI vive nello store claude (condiviso con
+// l'editor) e si legge entrando nella scheda. La prova manda istruzione +
+// testo e mostra la risposta grezza, per verificare il giro senza toccare
+// l'editor.
 const claudeInstruction = ref('')
 const claudeText = ref('')
 const claudeReply = ref(null)
 const claudeBusy = ref(false)
 
 const claudeStatusIcon = computed(() => {
-  if (!claude.value?.found) return 'lucide:circle-x'
-  if (!claude.value.loggedIn) return 'lucide:circle-alert'
+  if (!claude.found) return 'lucide:circle-x'
+  if (!claude.ready) return 'lucide:circle-alert'
   return 'lucide:check-circle'
 })
 
-async function refreshClaude() {
-  claudeChecking.value = true
-  try {
-    claude.value = await api.claudeStatus()
-  } catch {
-    claude.value = { found: false, loggedIn: false }
-  } finally {
-    claudeChecking.value = false
-  }
+function refreshClaude() {
+  return claude.refresh()
 }
 
 watch(
   () => ui.settingsOpen && current.value.id === 'claude',
   (on) => {
-    if (on && !claude.value) refreshClaude()
+    if (on) refreshClaude()
   },
   { immediate: true }
 )
@@ -590,7 +599,7 @@ function stopClaudePoll() {
 }
 async function onClaudeLogin() {
   try {
-    await api.claudeLogin()
+    await claude.login()
   } catch (err) {
     toast.add({ severity: 'error', summary: t('settings.claude.errFailed'), detail: err?.message || String(err), life: 8000 })
     return
@@ -599,9 +608,9 @@ async function onClaudeLogin() {
   const startedAt = Date.now()
   claudePoll = setInterval(async () => {
     if (Date.now() - startedAt > 3 * 60 * 1000) return stopClaudePoll()
-    if (claudeChecking.value) return
+    if (claude.checking) return
     await refreshClaude()
-    if (claude.value?.loggedIn) stopClaudePoll()
+    if (claude.ready) stopClaudePoll()
   }, 3000)
 }
 onBeforeUnmount(stopClaudePoll)

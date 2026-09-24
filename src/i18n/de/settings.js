@@ -126,6 +126,8 @@ export default {
 
   claude: {
     title: 'Claude Code',
+    enableLabel: 'Im Editor anzeigen',
+    enableDesc: 'Fügt der Notizleiste eine Claude-Schaltfläche mit Korrigieren, Umformulieren, Zusammenfassen und Weiterschreiben hinzu.',
     statusLabel: 'Kommandozeilen-Tool',
     statusDesc: 'RustNotes nutzt die bereits auf diesem Mac installierte Claude Code CLI. In der App wird kein API-Schlüssel gespeichert.',
     recheck: 'Erneut prüfen',

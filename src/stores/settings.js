@@ -45,6 +45,7 @@ export const useSettingsStore = defineStore('settings', {
     spellcheck: false, // correzione ortografica disattivata di default
     spellLang: 'it', // lingua della correzione quando attiva
     language: 'system', // 'system' | 'en' | 'it' — lingua dell'interfaccia
+    claudeEnabled: true, // azioni Claude nell'editor (visibili solo se la CLI c'e')
     ...loadSaved()
   }),
 
@@ -106,6 +107,11 @@ export const useSettingsStore = defineStore('settings', {
       this.save()
     },
 
+    toggleClaude() {
+      this.claudeEnabled = !this.claudeEnabled
+      this.save()
+    },
+
     toggleSpellcheck() {
       this.spellcheck = !this.spellcheck
       this.save()
@@ -127,7 +133,8 @@ export const useSettingsStore = defineStore('settings', {
           pinnedOnly: this.pinnedOnly,
           spellcheck: this.spellcheck,
           spellLang: this.spellLang,
-          language: this.language
+          language: this.language,
+          claudeEnabled: this.claudeEnabled
         })
       )
     }

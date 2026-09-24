@@ -13,13 +13,15 @@
 
 use serde::Serialize;
 use serde_json::Value;
-use tauri::AppHandle;
-use tauri_plugin_opener::OpenerExt;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Mutex;
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
+use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_opener::OpenerExt;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, Command};
 
 /// Tempo massimo per una risposta. Un testo lungo da riformulare puo'
 /// richiedere piu' di un minuto; oltre tre e' quasi certamente un blocco.
@@ -30,8 +32,22 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
 const SYSTEM_PROMPT: &str = "You are a writing assistant embedded in a notes app. \
 The user sends an instruction followed by a text. Reply ONLY with the requested text: \
-no preamble, no explanation, no closing remarks, no markdown code fences. \
+no preamble, no explanation, no closing remarks, no code fences around the whole reply. \
+When the input text is Markdown, reply in Markdown and preserve its structure \
+(headings, lists, links, images, tables) unless the instruction says otherwise. \
 Write in the same language as the input text unless the instruction asks otherwise.";
+
+/// Processi `claude -p` in corso, per richiesta: serve al comando di
+/// annullamento. Registrato come stato Tauri in lib.rs.
+#[derive(Default)]
+pub struct Running(pub Mutex<HashMap<String, Child>>);
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DeltaEvent<'a> {
+    request_id: &'a str,
+    text: &'a str,
+}
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -246,7 +262,17 @@ pub fn parse_result(stdout: &str) -> Result<ClaudeReply, ClaudeError> {
 }
 
 /// Manda `instruction` + `text` a Claude e ritorna il solo testo di risposta.
-pub async fn run(instruction: &str, text: &str) -> Result<ClaudeReply, ClaudeError> {
+///
+/// Legge l'output in streaming (`stream-json`): ogni frammento di testo viene
+/// passato a `on_delta` mentre arriva, la riga finale `result` e' la stessa
+/// del formato json e da' testo completo, costo e durata. Con `registry` e
+/// `request_id` il processo resta annullabile da `cancel`.
+pub async fn run(
+    instruction: &str,
+    text: &str,
+    registry: Option<(&Running, &str)>,
+    mut on_delta: impl FnMut(&str),
+) -> Result<ClaudeReply, ClaudeError> {
     let bin = find_binary()
         .await
         .ok_or_else(|| ClaudeError::new("not-found", "claude binary not found"))?;
@@ -255,7 +281,9 @@ pub async fn run(instruction: &str, text: &str) -> Result<ClaudeReply, ClaudeErr
         .args([
             "-p",
             "--output-format",
-            "json",
+            "stream-json",
+            "--verbose",
+            "--include-partial-messages",
             // Solo testo: niente Bash, niente lettura o scrittura di file.
             "--tools",
             "",
@@ -284,17 +312,91 @@ pub async fn run(instruction: &str, text: &str) -> Result<ClaudeReply, ClaudeErr
         // drop chiude stdin: la CLI legge fino a EOF.
     }
 
-    let out = tokio::time::timeout(RUN_TIMEOUT, child.wait_with_output())
-        .await
-        .map_err(|_| ClaudeError::new("timeout", "no reply within timeout"))?
-        .map_err(|e| ClaudeError::new("spawn-failed", e.to_string()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| ClaudeError::new("spawn-failed", "no stdout"))?;
+    let mut stderr = child.stderr.take();
 
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    if stdout.trim().is_empty() {
-        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        return Err(ClaudeError::new("failed", stderr));
+    // Il figlio va nel registro solo dopo aver preso stdout/stderr: da qui in
+    // avanti `cancel` puo' ucciderlo e la lettura termina per EOF.
+    let mut fallback: Option<Child> = None;
+    match registry {
+        Some((reg, id)) => {
+            reg.0.lock().unwrap().insert(id.to_string(), child);
+        }
+        None => fallback = Some(child),
     }
-    parse_result(&stdout)
+    let take_back = |registry: Option<(&Running, &str)>, fallback: Option<Child>| -> Option<Child> {
+        match registry {
+            Some((reg, id)) => reg.0.lock().unwrap().remove(id),
+            None => fallback,
+        }
+    };
+
+    let mut lines = BufReader::new(stdout).lines();
+    let mut result_line: Option<String> = None;
+    let read = async {
+        while let Ok(Some(line)) = lines.next_line().await {
+            let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+            match v.get("type").and_then(Value::as_str) {
+                Some("stream_event") => {
+                    if let Some(t) = v
+                        .pointer("/event/delta/text")
+                        .and_then(Value::as_str)
+                        .filter(|_| v.pointer("/event/delta/type").and_then(Value::as_str) == Some("text_delta"))
+                    {
+                        on_delta(t);
+                    }
+                }
+                Some("result") => result_line = Some(line),
+                _ => {}
+            }
+        }
+    };
+    let timed_out = tokio::time::timeout(RUN_TIMEOUT, read).await.is_err();
+
+    // Registro: se `cancel` ha gia' tolto il figlio, e' stato annullato.
+    let child = take_back(registry, fallback.take());
+    let cancelled = registry.is_some() && child.is_none();
+    if let Some(mut child) = child {
+        if timed_out {
+            let _ = child.start_kill();
+        }
+        let _ = child.wait().await;
+    }
+    if cancelled {
+        return Err(ClaudeError::new("cancelled", "cancelled by user"));
+    }
+    if timed_out {
+        return Err(ClaudeError::new("timeout", "no reply within timeout"));
+    }
+
+    match result_line {
+        Some(line) => parse_result(&line),
+        None => {
+            let mut msg = String::new();
+            if let Some(err) = stderr.as_mut() {
+                let mut buf = Vec::new();
+                let _ = tokio::io::AsyncReadExt::read_to_end(err, &mut buf).await;
+                msg = String::from_utf8_lossy(&buf).trim().to_string();
+            }
+            Err(ClaudeError::new("failed", msg))
+        }
+    }
+}
+
+/// Uccide il processo di una richiesta in corso. La `run` corrispondente
+/// vede EOF, non ritrova il figlio nel registro e ritorna `cancelled`.
+pub fn cancel(registry: &Running, request_id: &str) {
+    if let Some(mut child) = registry.0.lock().unwrap().remove(request_id) {
+        let _ = child.start_kill();
+        // Il wait lo fa `run`? No: il figlio e' uscito dal registro, quindi
+        // lo si raccoglie qui in background per non lasciare zombie.
+        tauri::async_runtime::spawn(async move {
+            let _ = child.wait().await;
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -352,8 +454,43 @@ pub async fn claude_login(app: AppHandle, done_message: String) -> Result<(), Cl
 
 #[tauri::command]
 pub async fn claude_run(instruction: String, text: String) -> Result<ClaudeReply, ClaudeError> {
-    let res = run(&instruction, &text).await;
-    match &res {
+    let res = run(&instruction, &text, None, |_| {}).await;
+    log_run(&res);
+    res
+}
+
+/// Come `claude_run`, ma ogni frammento arriva al frontend come evento
+/// `claude:delta` con `requestId`, e la richiesta e' annullabile.
+#[tauri::command]
+pub async fn claude_stream(
+    app: AppHandle,
+    running: State<'_, Running>,
+    request_id: String,
+    instruction: String,
+    text: String,
+) -> Result<ClaudeReply, ClaudeError> {
+    let res = run(&instruction, &text, Some((&running, &request_id)), |t| {
+        let _ = app.emit(
+            "claude:delta",
+            DeltaEvent {
+                request_id: &request_id,
+                text: t,
+            },
+        );
+    })
+    .await;
+    log_run(&res);
+    res
+}
+
+#[tauri::command]
+pub fn claude_cancel(running: State<'_, Running>, request_id: String) {
+    eprintln!("[rustnotes] claude_cancel -> {request_id}");
+    cancel(&running, &request_id);
+}
+
+fn log_run(res: &Result<ClaudeReply, ClaudeError>) {
+    match res {
         Ok(r) => eprintln!(
             "[rustnotes] claude_run -> {} caratteri, {} ms, ${:.4}",
             r.text.chars().count(),
@@ -362,7 +499,6 @@ pub async fn claude_run(instruction: String, text: String) -> Result<ClaudeReply
         ),
         Err(e) => eprintln!("[rustnotes] claude_run ERRORE {}: {}", e.code, e.message),
     }
-    res
 }
 
 #[cfg(test)]

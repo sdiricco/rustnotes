@@ -143,6 +143,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(claude::Running::default())
         .setup(|app| {
             let handle = app.handle().clone();
             match store::migrate_legacy(&handle) {
@@ -221,6 +222,8 @@ pub fn run() {
             claude::claude_status,
             claude::claude_login,
             claude::claude_run,
+            claude::claude_stream,
+            claude::claude_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione Tauri");

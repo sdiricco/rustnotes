@@ -27,5 +27,27 @@ export default {
     ordered: '编号',
     bullet: '项目符号',
     checklist: '核对清单'
+  },
+  // Menu "Claude" nella barra della nota e pannello di anteprima (ClaudePanel).
+  claude: {
+    menu: 'Claude',
+    onSelection: '针对所选内容',
+    onNote: '针对整篇笔记',
+    signInHint: '在设置中登录 Claude Code…',
+    actions: {
+      fix: '修正拼写和语法',
+      rephrase: '改写',
+      summarize: '总结',
+      continue: '续写'
+    },
+    working: 'Claude 正在撰写…',
+    meta: '用时 {s} 秒',
+    cancel: '取消',
+    discard: '放弃',
+    insertBelow: '插入到下方',
+    replace: '替换',
+    applied: '已应用。可用常规快捷键撤销。',
+    copiedToast: '已复制',
+    emptyNote: '笔记为空'
   }
 }

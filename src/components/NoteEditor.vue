@@ -26,6 +26,36 @@
              QuillEditor (toolbar vuota). Disponibile da Vue 3.5. -->
         <Teleport defer to="#header-note-actions">
         <div class="action-card">
+            <!-- Azioni Claude (claudeActions.js): il pulsante c'e' solo se la
+                 CLI di Claude Code e' installata e l'utente non l'ha nascosta
+                 in Impostazioni. Il menu dice su cosa agisce (selezione o
+                 nota) e, se manca l'accesso, rimanda a Impostazioni. -->
+            <div v-if="claudeVisible" ref="claudeMenuEl" class="action-overflow">
+              <button
+                class="icon-btn"
+                :class="{ active: claudeMenuOpen }"
+                :title="t('editor.claude.menu')"
+                :disabled="Boolean(claudeRun)"
+                @click="openClaudeMenu"
+              >
+                <Icon icon="lucide:sparkles" />
+              </button>
+              <div v-if="claudeMenuOpen" class="action-overflow-menu claude-menu">
+                <div class="claude-menu-scope">
+                  {{ t(claudeScopeIsSelection ? 'editor.claude.onSelection' : 'editor.claude.onNote') }}
+                </div>
+                <template v-if="claude.ready">
+                  <button v-for="a in CLAUDE_ACTIONS" :key="a.id" @click="startClaude(a)">
+                    <Icon :icon="a.icon" />
+                    <span>{{ t(`editor.claude.actions.${a.id}`) }}</span>
+                  </button>
+                </template>
+                <button v-else @click="ui.openSettings('claude'); claudeMenuOpen = false">
+                  <Icon icon="lucide:log-in" />
+                  <span>{{ t('editor.claude.signInHint') }}</span>
+                </button>
+              </div>
+            </div>
             <button class="icon-btn" :title="t('editor.findInNote', { shortcut: shortcut('mod+F') })" @click="quillEditorRef?.toggleFindBar()">
               <Icon icon="lucide:search" />
             </button>
@@ -85,6 +115,20 @@
         @change="onContentChange"
       />
 
+      <ClaudePanel
+        :visible="Boolean(claudeRun)"
+        :action="claudeRun?.action"
+        :on-selection="Boolean(claudeRun?.range)"
+        :text="claudeRun?.text || ''"
+        :streaming="Boolean(claudeRun?.streaming)"
+        :reply="claudeRun?.reply"
+        :error="claudeRun?.error || ''"
+        @replace="applyClaude('replace')"
+        @insert="applyClaude('insert')"
+        @copy="copyClaude"
+        @discard="discardClaude"
+      />
+
       <Dialog
         v-model:visible="markdownPreviewOpen"
         modal
@@ -110,20 +154,26 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import { Icon } from '@iconify/vue'
 import { useNotesStore } from '../stores/notes'
 import { useSettingsStore } from '../stores/settings'
+import { useUiStore } from '../stores/ui'
+import { useClaudeStore } from '../stores/claude'
 import QuillEditor from './QuillEditor.vue'
+import ClaudePanel from './ClaudePanel.vue'
 import { htmlToMarkdown, markdownToHtml } from '../utils/markdown'
 import { api } from '../utils/api'
 import { isMac, shortcut } from '../utils/shortcuts'
+import { CLAUDE_ACTIONS, buildInstruction, stripOuterFence } from '../utils/claudeActions'
 
 const store = useNotesStore()
 const settings = useSettingsStore()
+const ui = useUiStore()
+const claude = useClaudeStore()
 const toast = useToast()
 const { t } = useI18n()
 
@@ -164,6 +214,114 @@ function onGlobalMousedown(event) {
   if (actionMenuOpen.value && actionOverflowEl.value && !actionOverflowEl.value.contains(event.target)) {
     actionMenuOpen.value = false
   }
+  if (claudeMenuOpen.value && claudeMenuEl.value && !claudeMenuEl.value.contains(event.target)) {
+    claudeMenuOpen.value = false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Claude. Il testo di partenza e' la selezione, o tutta la nota se non c'e';
+// viaggia come Markdown (una selezione dentro una sola riga come testo
+// piano). Il risultato arriva in streaming nel pannello e si applica solo su
+// richiesta, tramite gli helper esposti da QuillEditor.
+// ---------------------------------------------------------------------------
+const claudeMenuOpen = ref(false)
+const claudeMenuEl = ref(null)
+// Richiesta in corso o in anteprima: { id, action, range, inline, text,
+// streaming, reply, error }. null = pannello chiuso.
+const claudeRun = ref(null)
+// Aggiornato quando si apre il menu: la selezione non e' reattiva.
+const claudeScopeIsSelection = ref(false)
+
+const claudeVisible = computed(() => settings.claudeEnabled && claude.found)
+
+onMounted(() => {
+  if (settings.claudeEnabled) claude.ensure()
+})
+
+function openClaudeMenu() {
+  claudeScopeIsSelection.value = Boolean(quillEditorRef.value?.getRange())
+  claudeMenuOpen.value = !claudeMenuOpen.value
+}
+
+const CLAUDE_ERRORS = {
+  'not-found': 'settings.claude.errNotFound',
+  'not-logged-in': 'settings.claude.errNotLoggedIn',
+  timeout: 'settings.claude.errTimeout'
+}
+
+async function startClaude(action) {
+  claudeMenuOpen.value = false
+  const editor = quillEditorRef.value
+  if (!editor) return
+  const range = editor.getRange()
+  const inline = Boolean(range) && !editor.getPlainText(range).includes('\n')
+  const source = range
+    ? inline
+      ? editor.getPlainText(range)
+      : editor.getMarkdown(range)
+    : htmlToMarkdown(store.selectedNote.content)
+  if (!source.trim()) {
+    toast.add({ severity: 'warn', summary: t('editor.claude.emptyNote'), life: 2500 })
+    return
+  }
+
+  // reactive() e non oggetto piano: lo si muta da qui (frammenti, fine,
+  // errore) e il pannello deve vederlo. Un oggetto piano dentro claudeRun
+  // sarebbe un proxy diverso da `run`, e le scritture su `run` resterebbero
+  // invisibili (e il confronto claudeRun.value === run fallirebbe).
+  const run = reactive({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    action,
+    range,
+    inline,
+    text: '',
+    streaming: true,
+    reply: null,
+    error: ''
+  })
+  claudeRun.value = run
+  try {
+    const reply = await claude.run(run.id, buildInstruction(action, { inline }), source, (delta) => {
+      if (claudeRun.value === run) run.text += delta
+    })
+    if (claudeRun.value !== run) return
+    run.text = stripOuterFence(reply.text)
+    run.reply = reply
+  } catch (err) {
+    if (claudeRun.value !== run || err?.code === 'cancelled') return
+    run.error = `${t(CLAUDE_ERRORS[err?.code] || 'settings.claude.errFailed')}${err?.message ? ` — ${err.message}` : ''}`
+    if (err?.code === 'not-found' || err?.code === 'not-logged-in') claude.refresh()
+  } finally {
+    run.streaming = false
+  }
+}
+
+function applyClaude(mode) {
+  const run = claudeRun.value
+  const editor = quillEditorRef.value
+  if (!run || !editor || run.streaming || !run.text) return
+  // Testo piano solo se la partenza era una riga e la risposta pure:
+  // un riassunto a punti di una frase resta Markdown e va a capo.
+  const plain = run.inline && !run.text.includes('\n')
+  const content = plain ? { text: run.text } : { markdown: run.text }
+  if (mode === 'replace') editor.replaceRange(run.range, content)
+  else editor.insertAfter(run.range, content)
+  claudeRun.value = null
+  toast.add({ severity: 'success', summary: t('editor.claude.applied'), life: 1800 })
+}
+
+async function copyClaude() {
+  if (!claudeRun.value?.text) return
+  await navigator.clipboard.writeText(claudeRun.value.text)
+  toast.add({ severity: 'success', summary: t('editor.claude.copiedToast'), life: 1800 })
+}
+
+function discardClaude() {
+  const run = claudeRun.value
+  if (!run) return
+  if (run.streaming) claude.cancel(run.id)
+  claudeRun.value = null
 }
 
 // Il trascinamento della finestra ora e' tutto nell'header globale
@@ -316,6 +474,21 @@ async function copyNote() {
   font-size: 15px;
   color: var(--icon-color);
   flex-shrink: 0;
+}
+
+.claude-menu-scope {
+  font-size: 11px;
+  color: var(--p-text-muted-color);
+  padding: 5px 10px 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.icon-btn.active {
+  background: var(--sidebar-hover-bg);
+}
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .icon-btn {

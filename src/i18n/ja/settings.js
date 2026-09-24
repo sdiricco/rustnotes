@@ -126,6 +126,8 @@ export default {
 
   claude: {
     title: 'Claude Code',
+    enableLabel: 'エディタに表示',
+    enableDesc: 'ノートのツールバーに、修正・言い換え・要約・続きを書くのClaudeボタンを追加します。',
     statusLabel: 'コマンドラインツール',
     statusDesc: 'RustNotesはこのMacにインストール済みのClaude Code CLIを使用します。アプリにAPIキーは保存されません。',
     recheck: '再確認',

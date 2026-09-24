@@ -247,7 +247,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { useSettingsStore } from '../stores/settings'
 import { api } from '../utils/api'
 import { shortcut } from '../utils/shortcuts'
-import { htmlToMarkdown } from '../utils/markdown'
+import { htmlToMarkdown, markdownToHtml } from '../utils/markdown'
 import { RustNotesClipboard } from '../utils/quillClipboard'
 import { Vue3ColorPicker } from '@cyhnkckali/vue3-color-picker'
 import '@cyhnkckali/vue3-color-picker/dist/style.css'
@@ -1540,7 +1540,80 @@ function focusEditor() {
   quill?.focus()
 }
 
-defineExpose({ focusEditor, toggleFindBar })
+// ---------------------------------------------------------------------------
+// Accesso al contenuto per le azioni Claude (NoteEditor). Il testo viaggia
+// come Markdown (htmlToMarkdown / markdownToHtml, gli stessi di import ed
+// export), tranne una selezione dentro una sola riga che resta testo piano.
+// Ogni applicazione e' un solo updateContents con source 'user': un solo
+// passo di annulla, e il contenuto salvato si aggiorna dal text-change.
+// ---------------------------------------------------------------------------
+const Delta = Quill.import('delta')
+
+// Selezione corrente, null se assente o vuota.
+function getRange() {
+  const r = quill?.getSelection()
+  return r && r.length ? { index: r.index, length: r.length } : null
+}
+
+// Tutta la nota (senza il \n finale che Quill tiene sempre in coda).
+function fullRange() {
+  return { index: 0, length: Math.max(0, quill.getLength() - 1) }
+}
+
+function getPlainText(range) {
+  return quill.getText(range.index, range.length)
+}
+
+function getMarkdown(range) {
+  return htmlToMarkdown(quill.getSemanticHTML(range.index, range.length))
+}
+
+// Delta di inserimento da Markdown. Se il punto in cui si inserisce e'
+// seguito dal \n di chiusura della riga, il \n finale del Markdown creerebbe
+// un paragrafo vuoto in piu': lo si toglie.
+function markdownDelta(markdown, insertAt) {
+  const delta = quill.clipboard.convert({ html: markdownToHtml(markdown) })
+  const ops = delta.ops
+  const last = ops[ops.length - 1]
+  const nextIsNewline = quill.getText(insertAt, 1) === '\n'
+  if (nextIsNewline && last && typeof last.insert === 'string' && last.insert.endsWith('\n') && !last.attributes) {
+    last.insert = last.insert.slice(0, -1)
+    if (!last.insert) ops.pop()
+  }
+  return delta
+}
+
+// Sostituisce `range` (o tutta la nota se null) con testo piano o Markdown.
+function replaceRange(range, { text, markdown }) {
+  const r = range || fullRange()
+  const insert = markdown != null ? markdownDelta(markdown, r.index + r.length) : new Delta().insert(text)
+  quill.updateContents(new Delta().retain(r.index).delete(r.length).concat(insert), 'user')
+  const len = insert.length()
+  quill.setSelection(r.index, len, 'user')
+}
+
+// Inserisce dopo `range` (o in coda alla nota se null). Il testo piano va
+// subito dopo la selezione, sulla stessa riga; il Markdown parte dalla riga
+// successiva, cosi' i suoi blocchi (paragrafi, elenchi) restano interi.
+function insertAfter(range, { text, markdown }) {
+  const end = range ? range.index + range.length : quill.getLength() - 1
+  let index
+  let insert
+  if (markdown != null) {
+    const [line, offset] = quill.getLine(end)
+    index = end - offset + (line ? line.length() : 0)
+    insert = markdownDelta(markdown, index)
+  } else {
+    index = end
+    const before = quill.getText(Math.max(0, end - 1), 1)
+    insert = new Delta().insert((before && !/\s/.test(before) ? ' ' : '') + text)
+  }
+  quill.updateContents(new Delta().retain(index).concat(insert), 'user')
+  const len = insert.length()
+  quill.setSelection(index, len, 'user')
+}
+
+defineExpose({ focusEditor, toggleFindBar, getRange, getPlainText, getMarkdown, replaceRange, insertAfter })
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousedown', onGlobalMousedown)

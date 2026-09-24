@@ -126,6 +126,8 @@ export default {
 
   claude: {
     title: 'Claude Code',
+    enableLabel: '在编辑器中显示',
+    enableDesc: '在笔记工具栏添加 Claude 按钮，提供修正、改写、总结和续写。',
     statusLabel: '命令行工具',
     statusDesc: 'RustNotes 使用这台 Mac 上已安装的 Claude Code 命令行工具。应用中不保存任何 API 密钥。',
     recheck: '重新检查',
