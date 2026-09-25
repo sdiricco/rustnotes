@@ -69,7 +69,14 @@
                 <span v-else>{{ part.value }}</span>
               </template>
             </div>
-            <div v-else class="cp-text">{{ run.text }}<span v-if="run.streaming" class="cp-caret" /></div>
+            <!-- Proposta compilata: lo stesso HTML che finira' nella nota
+                 (markdownToHtml, come import e inserimento), non il Markdown
+                 grezzo. Una selezione dentro una riga e' testo piano. -->
+            <div v-else-if="run.inline" class="cp-text">{{ run.text }}<span v-if="run.streaming" class="cp-caret" /></div>
+            <div v-else class="cp-text cp-rich">
+              <div v-html="renderedHtml"></div>
+              <span v-if="run.streaming" class="cp-caret" />
+            </div>
 
             <div class="cp-foot">
               <span class="cp-meta">
@@ -120,6 +127,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { diffWords } from 'diff'
 import { CLAUDE_ACTIONS } from '../utils/claudeActions'
+import { markdownToHtml, stripHtml } from '../utils/markdown'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -146,7 +154,11 @@ const primary = computed(() => props.run?.action?.primary || 'replace')
 // Il confronto ha senso solo quando la proposta rimpiazza il testo di
 // partenza: per riassunto e continuazione si mostra solo la proposta.
 const canDiff = computed(() => done.value && primary.value === 'replace' && Boolean(props.run.original))
-const diffParts = computed(() => (canDiff.value ? diffWords(props.run.original, props.run.text) : []))
+// Le differenze si leggono sul testo, non sulla sintassi Markdown: prima e
+// dopo passano dallo stesso rendering e ne resta solo il testo.
+const asText = (md) => (props.run.inline ? md : stripHtml(markdownToHtml(md)))
+const diffParts = computed(() => (canDiff.value ? diffWords(asText(props.run.original), asText(props.run.text)) : []))
+const renderedHtml = computed(() => (props.run && !props.run.inline ? markdownToHtml(props.run.text) : ''))
 
 function autosize() {
   const el = inputEl.value
@@ -405,6 +417,95 @@ watch(
   white-space: pre-wrap;
   word-break: break-word;
   flex: 1;
+}
+.cp-rich {
+  white-space: normal;
+}
+.cp-rich :deep(> div > *:first-child) {
+  margin-top: 0;
+}
+.cp-rich :deep(> div > *:last-child) {
+  margin-bottom: 0;
+}
+.cp-rich :deep(p),
+.cp-rich :deep(ul),
+.cp-rich :deep(ol),
+.cp-rich :deep(blockquote),
+.cp-rich :deep(pre),
+.cp-rich :deep(table) {
+  margin: 0 0 8px;
+}
+.cp-rich :deep(h1),
+.cp-rich :deep(h2),
+.cp-rich :deep(h3) {
+  margin: 10px 0 4px;
+  line-height: 1.3;
+}
+.cp-rich :deep(h1) {
+  font-size: 17px;
+}
+.cp-rich :deep(h2) {
+  font-size: 15px;
+}
+.cp-rich :deep(h3) {
+  font-size: 14px;
+}
+.cp-rich :deep(ul),
+.cp-rich :deep(ol) {
+  padding-left: 22px;
+}
+.cp-rich :deep(li) {
+  margin: 2px 0;
+}
+/* Checklist nel formato di Quill (data-list): qui solo un segno, il vero
+   controllo lo si avra' nella nota. */
+.cp-rich :deep(li[data-list='checked']),
+.cp-rich :deep(li[data-list='unchecked']) {
+  list-style: none;
+  margin-left: -18px;
+}
+.cp-rich :deep(li[data-list='checked'])::before {
+  content: '☑ ';
+}
+.cp-rich :deep(li[data-list='unchecked'])::before {
+  content: '☐ ';
+}
+.cp-rich :deep(blockquote) {
+  border-left: 3px solid var(--p-content-border-color);
+  padding-left: 10px;
+  color: var(--p-text-muted-color);
+}
+.cp-rich :deep(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: rgba(127, 127, 127, 0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+.cp-rich :deep(pre) {
+  background: rgba(127, 127, 127, 0.15);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow: auto;
+}
+.cp-rich :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+.cp-rich :deep(table) {
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.cp-rich :deep(th),
+.cp-rich :deep(td) {
+  border: 1px solid var(--p-content-border-color);
+  padding: 3px 8px;
+}
+.cp-rich :deep(a) {
+  color: #7c5cff;
+}
+.cp-rich :deep(img) {
+  max-width: 100%;
 }
 .cp-diff del {
   background: rgba(220, 38, 38, 0.16);

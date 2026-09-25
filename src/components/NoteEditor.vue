@@ -299,6 +299,7 @@ async function startClaude(instruction, { action, label }) {
     label,
     instruction,
     original: ctx.source,
+    inline: ctx.inline,
     text: '',
     streaming: true,
     reply: null,
