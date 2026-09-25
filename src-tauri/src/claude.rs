@@ -139,6 +139,7 @@ fn path_dirs() -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
+#[cfg(unix)]
 fn is_executable(p: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     std::fs::metadata(p)
@@ -146,10 +147,25 @@ fn is_executable(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// Su Windows non c'e' il bit di esecuzione: conta l'estensione (vedi
+/// BINARY_NAMES).
+#[cfg(not(unix))]
+fn is_executable(p: &Path) -> bool {
+    p.is_file()
+}
+
+/// Nomi con cui il binario puo' presentarsi: `claude.exe` dall'installer
+/// nativo, `claude.cmd` da npm (Rust lo esegue tramite cmd.exe da solo).
+#[cfg(windows)]
+const BINARY_NAMES: &[&str] = &["claude.exe", "claude.cmd"];
+#[cfg(not(windows))]
+const BINARY_NAMES: &[&str] = &["claude"];
+
 /// Ultima risorsa: chiede alla shell di login dell'utente, che carica il suo
 /// PATH completo (.zprofile/.zshrc, nvm, ecc.). Lento (100-500 ms) e
 /// rumoroso (una shell interattiva puo' stampare altro), quindi si prende
 /// solo l'ultima riga che sembra un percorso.
+#[cfg(unix)]
 async fn ask_login_shell() -> Option<PathBuf> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
     let out = tokio::time::timeout(
@@ -173,11 +189,20 @@ async fn ask_login_shell() -> Option<PathBuf> {
         .filter(|p| is_executable(p))
 }
 
+/// Su Windows il PATH dell'utente arriva intero anche alle app grafiche:
+/// niente shell di login da interrogare.
+#[cfg(not(unix))]
+async fn ask_login_shell() -> Option<PathBuf> {
+    None
+}
+
 pub async fn find_binary() -> Option<PathBuf> {
     for dir in path_dirs().into_iter().chain(known_dirs()) {
-        let p = dir.join("claude");
-        if is_executable(&p) {
-            return Some(p);
+        for name in BINARY_NAMES {
+            let p = dir.join(name);
+            if is_executable(&p) {
+                return Some(p);
+            }
         }
     }
     ask_login_shell().await
@@ -531,13 +556,10 @@ pub async fn login(app: &AppHandle, done_message: &str) -> Result<(), ClaudeErro
     let bin = find_binary()
         .await
         .ok_or_else(|| ClaudeError::new("not-found", "claude binary not found"))?;
-    let script = work_dir().join("login.command");
-    let body = format!(
-        "#!/bin/zsh\nclear\n\"{}\" auth login\necho\necho {}\n",
-        bin.display(),
-        shell_quote(done_message)
-    );
-    std::fs::write(&script, body).map_err(|e| ClaudeError::new("failed", e.to_string()))?;
+    let script = work_dir().join(LOGIN_SCRIPT_NAME);
+    std::fs::write(&script, login_script(&bin, done_message))
+        .map_err(|e| ClaudeError::new("failed", e.to_string()))?;
+    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))
@@ -548,6 +570,31 @@ pub async fn login(app: &AppHandle, done_message: &str) -> Result<(), ClaudeErro
         .map_err(|e| ClaudeError::new("failed", e.to_string()))
 }
 
+/// `.command` lo apre Terminal.app; `.cmd` lo apre una console di Windows.
+#[cfg(windows)]
+const LOGIN_SCRIPT_NAME: &str = "login.cmd";
+#[cfg(not(windows))]
+const LOGIN_SCRIPT_NAME: &str = "login.command";
+
+#[cfg(windows)]
+fn login_script(bin: &Path, done_message: &str) -> String {
+    format!(
+        "@echo off\r\n\"{}\" auth login\r\necho.\r\necho {}\r\npause\r\n",
+        bin.display(),
+        done_message.replace(['&', '|', '<', '>', '^'], " ")
+    )
+}
+
+#[cfg(not(windows))]
+fn login_script(bin: &Path, done_message: &str) -> String {
+    format!(
+        "#!/bin/zsh\nclear\n\"{}\" auth login\necho\necho {}\n",
+        bin.display(),
+        shell_quote(done_message)
+    )
+}
+
+#[cfg(not(windows))]
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
@@ -688,6 +735,7 @@ mod tests {
         assert_eq!(e.code, "not-logged-in");
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn quote_for_shell() {
         assert_eq!(shell_quote("ciao"), "'ciao'");
