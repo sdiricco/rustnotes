@@ -122,7 +122,12 @@ export default {
     checking: 'Vérification…',
     checkUpdates: 'Rechercher les mises à jour',
     available: 'Version {version} disponible — exécutez',
-    upToDate: 'Vous disposez de la dernière version'
+    upToDate: 'Vous disposez de la dernière version',
+    availableInstall: 'Version {version} disponible',
+    install: 'Installer et redémarrer',
+    downloading: 'Téléchargement… {percent}%',
+    installing: 'Installation…',
+    installFailed: 'Échec de la mise à jour : {error}'
   },
 
   claude: {

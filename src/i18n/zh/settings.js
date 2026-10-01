@@ -122,7 +122,12 @@ export default {
     checking: '正在检查…',
     checkUpdates: '检查更新',
     available: '{version} 版可用 — 请运行',
-    upToDate: '您已安装最新版本'
+    upToDate: '您已安装最新版本',
+    availableInstall: '{version} 版可用',
+    install: '安装并重新启动',
+    downloading: '正在下载… {percent}%',
+    installing: '正在安装…',
+    installFailed: '更新失败：{error}'
   },
 
   claude: {

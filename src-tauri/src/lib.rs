@@ -13,7 +13,7 @@ mod update_check;
 mod zoom;
 
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager, Theme};
+use tauri::{AppHandle, Manager, Theme};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
@@ -85,12 +85,13 @@ fn store_set_data_dir(
     Ok(res)
 }
 
+// Ripiego "solo notifica" per le installazioni che l'updater non sa
+// aggiornare (Linux .deb/.rpm): confronta la versione con l'ultima release
+// e lascia all'utente il package manager.
 #[tauri::command]
 async fn update_check_run(app: AppHandle) -> update_check::UpdateStatus {
     let version = app.package_info().version.to_string();
-    let status = update_check::check(version).await;
-    let _ = app.emit("update-check:status", status.clone());
-    status
+    update_check::check(version).await
 }
 
 #[tauri::command]
@@ -143,6 +144,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Aggiornamento in-app: `latest.json` firmato (minisign) su GitHub
+        // Releases, download e installazione dal frontend (stores/updateCheck).
+        // `process` serve solo per il riavvio a installazione finita.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(claude::Running::default())
         .manage(claude::Warm::default())
         .setup(|app| {
@@ -174,22 +180,9 @@ pub fn run() {
                 let _ = zoom::apply(&handle, saved);
             }
 
-            // Il controllo automatico periodico e' limitato alla build
-            // pacchettizzata, come nell'originale (`app.isPackaged`): in dev
-            // disturberebbe ogni avvio.
-            #[cfg(not(debug_assertions))]
-            {
-                let handle2 = handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
-                    loop {
-                        let version = handle2.package_info().version.to_string();
-                        let status = update_check::check(version).await;
-                        let _ = handle2.emit("update-check:status", status);
-                        tokio::time::sleep(std::time::Duration::from_secs(4 * 60 * 60)).await;
-                    }
-                });
-            }
+            // Il controllo periodico degli aggiornamenti e' nel frontend
+            // (stores/updateCheck.js), che usa il plugin updater e ricade su
+            // `update_check_run` dove l'updater non puo' operare (.deb/.rpm).
 
             Ok(())
         })

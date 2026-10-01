@@ -8,7 +8,10 @@ export default {
     available: 'Version {latest} disponible',
     availableTitle: 'Version {latest} disponible (actuelle : {current})',
     commandCopied: 'Commande copiée : {cmd}',
-    runCommand: 'Exécutez : {cmd}'
+    runCommand: 'Exécutez : {cmd}',
+    downloading: 'Téléchargement… {percent}%',
+    installing: 'Installation…',
+    failed: 'Échec de la mise à jour'
   },
   menu: {
     rename: 'Renommer',

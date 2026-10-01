@@ -112,11 +112,17 @@
       <button
         v-if="updateCheck.available"
         class="update-btn"
+        :class="{ busy: updateCheck.downloading }"
+        :disabled="updateCheck.downloading"
         :title="t('sidebar.update.availableTitle', { latest: updateCheck.latestVersion, current: updateCheck.currentVersion })"
         @click="onUpdateClick"
       >
-        <Icon icon="lucide:arrow-up-circle" />
-        <span>{{ t('sidebar.update.action') }}</span>
+        <Icon :icon="updateCheck.downloading ? 'lucide:loader-circle' : 'lucide:arrow-up-circle'" :class="{ spin: updateCheck.downloading }" />
+        <span v-if="updateCheck.downloading && updateCheck.progress !== null">
+          {{ t('sidebar.update.downloading', { percent: updateCheck.progress }) }}
+        </span>
+        <span v-else-if="updateCheck.downloading">{{ t('sidebar.update.installing') }}</span>
+        <span v-else>{{ t('sidebar.update.action') }}</span>
       </button>
     </div>
 
@@ -150,9 +156,23 @@ const updateCheck = useUpdateCheckStore()
 const confirm = useConfirm()
 const toast = useToast()
 
-const UPDATE_CMD = 'brew upgrade --cask mac-notes'
+const UPDATE_CMD = 'brew upgrade --cask rustnotes'
 
+// Con l'updater disponibile il tasto scarica, installa e riavvia; nel caso di
+// ripiego (installazioni .deb/.rpm) copia il comando manuale come prima.
 async function onUpdateClick() {
+  if (updateCheck.installable) {
+    await updateCheck.install()
+    if (updateCheck.error) {
+      toast.add({
+        severity: 'error',
+        summary: t('sidebar.update.failed'),
+        detail: updateCheck.error,
+        life: 6000
+      })
+    }
+    return
+  }
   try {
     await navigator.clipboard.writeText(UPDATE_CMD)
     toast.add({
@@ -399,6 +419,18 @@ function removeFolder(folder) {
   font-size: 15px;
   flex-shrink: 0;
   color: var(--icon-color);
+}
+.update-btn.busy {
+  cursor: progress;
+  font-weight: 500;
+}
+.update-btn :deep(svg.spin) {
+  animation: update-spin 1s linear infinite;
+}
+@keyframes update-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Riordino: la riga trascinata sbiadisce, e una linea segna il punto di

@@ -122,7 +122,12 @@ export default {
     checking: 'Verifica…',
     checkUpdates: 'Controlla aggiornamenti',
     available: 'Versione {version} disponibile — esegui',
-    upToDate: 'Hai già la versione più recente'
+    upToDate: 'Hai già la versione più recente',
+    availableInstall: 'Versione {version} disponibile',
+    install: 'Installa e riavvia',
+    downloading: 'Download… {percent}%',
+    installing: 'Installazione…',
+    installFailed: 'Aggiornamento non riuscito: {error}'
   },
 
   claude: {

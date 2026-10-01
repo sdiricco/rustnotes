@@ -25,6 +25,8 @@
     },
     "dialog:allow-open",
     "dialog:allow-save",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

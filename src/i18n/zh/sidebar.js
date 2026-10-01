@@ -8,7 +8,10 @@ export default {
     available: '{latest} 版可用',
     availableTitle: '{latest} 版可用（当前：{current}）',
     commandCopied: '命令已拷贝：{cmd}',
-    runCommand: '运行：{cmd}'
+    runCommand: '运行：{cmd}',
+    downloading: '正在下载… {percent}%',
+    installing: '正在安装…',
+    failed: '更新失败'
   },
   menu: {
     rename: '重新命名',

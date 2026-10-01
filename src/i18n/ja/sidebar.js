@@ -8,7 +8,10 @@ export default {
     available: 'バージョン{latest}が利用可能です',
     availableTitle: 'バージョン{latest}が利用可能です（現在: {current}）',
     commandCopied: 'コマンドをコピーしました: {cmd}',
-    runCommand: '実行: {cmd}'
+    runCommand: '実行: {cmd}',
+    downloading: 'ダウンロード中… {percent}%',
+    installing: 'インストール中…',
+    failed: 'アップデートに失敗しました'
   },
   menu: {
     rename: '名称変更',

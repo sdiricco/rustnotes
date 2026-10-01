@@ -49,7 +49,6 @@ export const api = {
 
   checkForUpdates: () => invoke('update_check_run'),
   getAppVersion: () => invoke('update_check_app_version'),
-  onUpdateCheckStatus: (callback) => bridgeEvent('update-check:status', callback),
 
   // I dialoghi nativi vivono in Rust, fuori da vue-i18n: il titolo viene
   // tradotto qui e passato come parametro, cosi' i componenti non se ne

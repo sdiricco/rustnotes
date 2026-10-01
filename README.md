@@ -56,8 +56,16 @@ Download the installer for your platform from the
 (NSIS `.exe` for Windows, `.AppImage` / `.deb` for Linux, x64 and arm64).
 
 Windows will show a SmartScreen warning because the installer is not code-signed.
-There is no in-app updater yet: download the new installer at each release.
-The app checks GitHub Releases and tells you when a newer version exists.
+
+### Updates
+
+Since 0.15 the app updates itself: it checks GitHub Releases a few seconds after
+startup and every few hours, and when a newer version exists an *Update* button
+appears at the bottom of the sidebar (also in Settings → About). One click
+downloads the signed build, verifies it and restarts. On Linux this works for
+the AppImage; `.deb`/`.rpm` installs are only notified and update through the
+package manager. Homebrew users can keep using `brew upgrade --cask rustnotes`
+as well.
 
 ## Your data
 

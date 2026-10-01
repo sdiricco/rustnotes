@@ -122,7 +122,12 @@ export default {
     checking: '確認中…',
     checkUpdates: 'アップデートを確認',
     available: 'バージョン{version}が利用可能です — 次のコマンドを実行してください:',
-    upToDate: '最新バージョンを使用しています'
+    upToDate: '最新バージョンを使用しています',
+    availableInstall: 'バージョン{version}が利用可能です',
+    install: 'インストールして再起動',
+    downloading: 'ダウンロード中… {percent}%',
+    installing: 'インストール中…',
+    installFailed: 'アップデートに失敗しました: {error}'
   },
 
   claude: {

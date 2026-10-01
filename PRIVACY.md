@@ -16,11 +16,15 @@ never uploads them anywhere.
 
 Only two things, and both are visible in the source code:
 
-1. **Update check.** At startup the app sends one anonymous `GET` request to
-   the public GitHub Releases API (`api.github.com`) to learn the latest
-   version number. It carries no identifier beyond what any web request
-   carries (your IP address, seen by GitHub). Nothing is downloaded or
-   installed automatically. See
+1. **Update check and in-app updates.** Shortly after startup, and every
+   few hours, the app downloads a small `latest.json` from this project's
+   GitHub Releases to learn the latest version. The request carries no
+   identifier beyond what any web request carries (your IP address, seen by
+   GitHub). If a newer version exists the app tells you; only when you press
+   *Install and restart* does it download the new build from GitHub, verify
+   its signature and install it. On Linux `.deb`/`.rpm` installs the app only
+   notifies and leaves the update to your package manager. See
+   [`updateCheck.js`](src/stores/updateCheck.js) and
    [`update_check.rs`](src-tauri/src/update_check.rs).
 
 2. **Claude assistant (optional).** If you use it, the selection or note you

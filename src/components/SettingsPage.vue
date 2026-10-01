@@ -437,11 +437,28 @@
                 role="status"
               >
                 <Icon :icon="updateCheck.available ? 'lucide:arrow-up-circle' : 'lucide:check-circle'" />
-                <span v-if="updateCheck.available">
+                <template v-if="updateCheck.available && updateCheck.installable">
+                  <span>{{ t('settings.about.availableInstall', { version: updateCheck.latestVersion }) }}</span>
+                  <Button
+                    size="small"
+                    :label="updateCheck.downloading
+                      ? (updateCheck.progress !== null
+                        ? t('settings.about.downloading', { percent: updateCheck.progress })
+                        : t('settings.about.installing'))
+                      : t('settings.about.install')"
+                    :loading="updateCheck.downloading"
+                    @click="onInstallUpdate"
+                  />
+                </template>
+                <span v-else-if="updateCheck.available">
                   {{ t('settings.about.available', { version: updateCheck.latestVersion }) }}
                   <code>brew upgrade --cask rustnotes</code>
                 </span>
                 <span v-else>{{ t('settings.about.upToDate') }}</span>
+              </div>
+              <div v-if="updateCheck.error" class="update-status error" role="alert">
+                <Icon icon="lucide:circle-alert" />
+                <span>{{ t('settings.about.installFailed', { error: updateCheck.error }) }}</span>
               </div>
             </section>
           </template>
@@ -772,6 +789,12 @@ const shortcutGroups = computed(() => [
 async function onCheckUpdates() {
   await updateCheck.check()
   hasChecked.value = true
+}
+
+// Se va a buon fine l'app si riavvia da sola; se fallisce resta tutto com'e'
+// e `updateCheck.error` compare sotto allo stato.
+function onInstallUpdate() {
+  return updateCheck.install()
 }
 
 async function onExportAll() {
@@ -1201,6 +1224,13 @@ kbd {
 }
 .update-status.available :deep(svg) {
   color: #3b82f6;
+}
+.update-status.available .p-button {
+  margin-left: 4px;
+}
+.update-status.error,
+.update-status.error :deep(svg) {
+  color: var(--p-red-500, #ef4444);
 }
 .update-status code {
   background: var(--search-bg);
