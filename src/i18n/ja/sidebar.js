@@ -11,6 +11,7 @@ export default {
     runCommand: '実行: {cmd}',
     downloading: 'ダウンロード中… {percent}%',
     installing: 'インストール中…',
+    downloadingMb: 'ダウンロード中… {mb} MB',
     failed: 'アップデートに失敗しました'
   },
   menu: {

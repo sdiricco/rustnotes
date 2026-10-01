@@ -127,6 +127,7 @@ export default {
     install: 'Install and restart',
     downloading: 'Downloading… {percent}%',
     installing: 'Installing…',
+    downloadingMb: 'Downloading… {mb} MB',
     installFailed: 'Update failed: {error}'
   },
 

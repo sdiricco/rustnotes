@@ -11,6 +11,7 @@ export default {
     runCommand: 'Run: {cmd}',
     downloading: 'Downloading… {percent}%',
     installing: 'Installing…',
+    downloadingMb: 'Downloading… {mb} MB',
     failed: 'Update failed'
   },
   menu: {

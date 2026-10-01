@@ -444,7 +444,9 @@
                     :label="updateCheck.downloading
                       ? (updateCheck.progress !== null
                         ? t('settings.about.downloading', { percent: updateCheck.progress })
-                        : t('settings.about.installing'))
+                        : updateCheck.receivedMb > 0
+                          ? t('settings.about.downloadingMb', { mb: updateCheck.receivedMb })
+                          : t('settings.about.installing'))
                       : t('settings.about.install')"
                     :loading="updateCheck.downloading"
                     @click="onInstallUpdate"

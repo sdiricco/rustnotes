@@ -127,6 +127,7 @@ export default {
     install: '安装并重新启动',
     downloading: '正在下载… {percent}%',
     installing: '正在安装…',
+    downloadingMb: '正在下载… {mb} MB',
     installFailed: '更新失败：{error}'
   },
 

@@ -127,6 +127,7 @@ export default {
     install: 'インストールして再起動',
     downloading: 'ダウンロード中… {percent}%',
     installing: 'インストール中…',
+    downloadingMb: 'ダウンロード中… {mb} MB',
     installFailed: 'アップデートに失敗しました: {error}'
   },
 

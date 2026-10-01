@@ -121,6 +121,9 @@
         <span v-if="updateCheck.downloading && updateCheck.progress !== null">
           {{ t('sidebar.update.downloading', { percent: updateCheck.progress }) }}
         </span>
+        <span v-else-if="updateCheck.downloading && updateCheck.progress === null && updateCheck.receivedMb > 0">
+          {{ t('sidebar.update.downloadingMb', { mb: updateCheck.receivedMb }) }}
+        </span>
         <span v-else-if="updateCheck.downloading">{{ t('sidebar.update.installing') }}</span>
         <span v-else>{{ t('sidebar.update.action') }}</span>
       </button>

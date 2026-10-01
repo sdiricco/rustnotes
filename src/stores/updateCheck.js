@@ -12,6 +12,13 @@ import { api } from '../utils/api'
 const FIRST_CHECK_MS = 4_000
 const PERIODIC_CHECK_MS = 4 * 60 * 60 * 1000
 
+// L'oggetto `Update` del plugin resta FUORI dallo state di Pinia: la classe
+// usa campi privati (#...) e, avvolta nel Proxy reattivo, qualunque metodo
+// fallisce con "Cannot read private member from an object whose class did
+// not declare it".
+let pendingUpdate = null
+let timer = null
+
 export const useUpdateCheckStore = defineStore('updateCheck', {
   state: () => ({
     available: false,
@@ -23,11 +30,11 @@ export const useUpdateCheckStore = defineStore('updateCheck', {
     // si puo' solo avvisare (ripiego).
     installable: false,
     downloading: false,
-    // 0..100, null finche' la dimensione totale non e' nota
+    // 0..100, null finche' la dimensione totale non e' nota (GitHub non la
+    // dichiara sempre): in quel caso la UI mostra i MB ricevuti.
     progress: null,
-    error: null,
-    _update: null,
-    _timer: null
+    receivedMb: 0,
+    error: null
   }),
 
   actions: {
@@ -41,7 +48,7 @@ export const useUpdateCheckStore = defineStore('updateCheck', {
       // in origine: in dev disturberebbe ogni avvio.
       if (import.meta.env.PROD) {
         setTimeout(() => this.check(), FIRST_CHECK_MS)
-        this._timer = setInterval(() => this.check(), PERIODIC_CHECK_MS)
+        timer = setInterval(() => this.check(), PERIODIC_CHECK_MS)
       }
     },
 
@@ -51,7 +58,7 @@ export const useUpdateCheckStore = defineStore('updateCheck', {
       this.error = null
       try {
         const update = await check()
-        this._update = update
+        pendingUpdate = update
         this.installable = true
         this.available = Boolean(update)
         this.latestVersion = update?.version ?? this.latestVersion
@@ -59,7 +66,7 @@ export const useUpdateCheckStore = defineStore('updateCheck', {
       } catch (e) {
         // L'updater non e' utilizzabile qui: si ricade sulla sola notifica.
         console.warn('[updateCheck] updater non disponibile, ripiego su notifica:', e)
-        this._update = null
+        pendingUpdate = null
         this.installable = false
         try {
           const status = await api.checkForUpdates()
@@ -78,19 +85,21 @@ export const useUpdateCheckStore = defineStore('updateCheck', {
     // Scarica, installa e riavvia. In caso di errore l'app resta com'e' e
     // `error` porta il messaggio alla UI; si puo' riprovare.
     async install() {
-      if (!this._update || this.downloading) return
+      if (!pendingUpdate || this.downloading) return
       this.downloading = true
       this.progress = null
+      this.receivedMb = 0
       this.error = null
       let total = 0
       let received = 0
       try {
-        await this._update.downloadAndInstall((event) => {
+        await pendingUpdate.downloadAndInstall((event) => {
           if (event.event === 'Started') {
             total = event.data.contentLength ?? 0
             if (total) this.progress = 0
           } else if (event.event === 'Progress') {
             received += event.data.chunkLength
+            this.receivedMb = Math.round(received / 1024 / 1024 * 10) / 10
             if (total) this.progress = Math.min(100, Math.round((received / total) * 100))
           } else if (event.event === 'Finished') {
             this.progress = 100

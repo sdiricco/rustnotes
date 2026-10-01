@@ -127,6 +127,7 @@ export default {
     install: 'Installieren und neu starten',
     downloading: 'Wird heruntergeladen… {percent}%',
     installing: 'Wird installiert…',
+    downloadingMb: 'Wird heruntergeladen… {mb} MB',
     installFailed: 'Aktualisierung fehlgeschlagen: {error}'
   },
 

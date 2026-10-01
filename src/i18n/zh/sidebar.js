@@ -11,6 +11,7 @@ export default {
     runCommand: '运行：{cmd}',
     downloading: '正在下载… {percent}%',
     installing: '正在安装…',
+    downloadingMb: '正在下载… {mb} MB',
     failed: '更新失败'
   },
   menu: {
