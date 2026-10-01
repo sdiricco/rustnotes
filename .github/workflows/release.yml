@@ -41,17 +41,34 @@ jobs:
       - name: Install dipendenze frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Build e pubblica (macOS universale)
+      # Chiave API di App Store Connect per la notarizzazione: tauri-action
+      # la legge da APPLE_API_KEY_PATH, quindi il contenuto del .p8 (secret)
+      # va scritto su disco prima della build.
+      - name: Prepara chiave API App Store Connect
+        run: |
+          echo "${{ secrets.APPLE_API_KEY_CONTENT }}" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+
+      # Firma con Developer ID e notarizzazione Apple. Il certificato arriva
+      # come .p12 in base64 (APPLE_CERTIFICATE): tauri-action lo importa in un
+      # keychain temporaneo del runner. Con la build notarizzata e stapled il
+      # .dmg si apre senza avvisi di Gatekeeper, niente piu' xattr a mano.
+      - name: Build e pubblica (macOS universale, firmata e notarizzata)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'RustNotes ${{ github.ref_name }}'
           releaseBody: |
-            macOS: l'app non e' firmata con un certificato Apple Developer ID.
-            Al primo avvio, tasto destro sull'app > Apri, oppure:
-            `xattr -dr com.apple.quarantine "/Applications/RustNotes.app"`
+            macOS: app firmata con Developer ID e notarizzata da Apple.
+            Windows: installer non firmato, SmartScreen puo' mostrare un avviso
+            al primo avvio ("Ulteriori informazioni" > "Esegui comunque").
 
             macOS e Linux: provati manualmente. Windows: compilato
             automaticamente ma non ancora testato a mano su questo progetto.

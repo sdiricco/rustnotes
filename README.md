@@ -45,12 +45,9 @@ Upgrade with `brew upgrade --cask rustnotes`. If you installed the earlier
 `mac-notes-tauri` cask from the `sdiricco/mac-notes` tap, run the `brew trust`
 line above once and `brew upgrade` migrates it to the new name on its own.
 
-The app is **not signed with an Apple Developer ID**. On first launch macOS says the
-developer cannot be verified. Right-click the app → Open, or from a terminal:
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/RustNotes.app"
-```
+Since 0.14.1 the app is **signed with an Apple Developer ID and notarized**: it
+opens without warnings. Older builds were unsigned; if you still have one, either
+upgrade or right-click the app → Open the first time.
 
 ### Windows and Linux
 
@@ -94,7 +91,8 @@ It writes one `.md` file per note, one subfolder per folder.
 
 Nothing ever leaves your machine except one anonymous `GET` to the GitHub Releases
 API to check for a newer version, and the text you explicitly send to the Claude
-assistant if you use it (next section).
+assistant if you use it (next section). The full statement is in
+[PRIVACY.md](PRIVACY.md).
 
 ## Claude assistant (optional)
 
