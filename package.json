@@ -16,7 +16,7 @@
     "@iconify-json/lucide": "^1.2.124",
     "@iconify/vue": "^5.0.1",
     "@primevue/themes": "^4.5.4",
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2.4.0",
@@ -36,7 +36,7 @@
     "vue-i18n": "^11.4.10"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
+    "@tauri-apps/cli": "^2.12.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "jsdom": "^30.0.1",
     "typescript": "~5.6.2",
