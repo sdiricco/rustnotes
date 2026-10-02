@@ -13,7 +13,7 @@ mod update_check;
 mod zoom;
 
 use serde_json::Value;
-use tauri::{AppHandle, Manager, Theme};
+use tauri::{window::Color, AppHandle, Manager, Theme};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
@@ -110,8 +110,25 @@ fn set_window_theme(app: AppHandle, dark: bool) -> Result<(), String> {
         window
             .set_theme(Some(if dark { Theme::Dark } else { Theme::Light }))
             .map_err(|e| e.to_string())?;
+        window
+            .set_background_color(Some(window_background(dark)))
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+// Colore della finestra dietro alla webview, che ha il body trasparente. Da
+// wry 0.57 la webview non dipinge piu' un fondo proprio quando
+// `backgroundColor` e' impostato (prima succedeva solo con la feature
+// "transparent"), quindi questo colore si vede attraverso gli elementi
+// traslucidi (sidebar, header): deve seguire il tema, altrimenti in scuro
+// restano su un fondo chiaro. Stessi valori di --editor-bg in main.css.
+fn window_background(dark: bool) -> Color {
+    if dark {
+        Color(26, 26, 26, 255)
+    } else {
+        Color(246, 246, 246, 255)
+    }
 }
 
 /// Geometria della barra del titolo per il CSS (vedi titlebar.rs). Il comando
@@ -153,6 +170,13 @@ pub fn run() {
         .manage(claude::Warm::default())
         .setup(|app| {
             let handle = app.handle().clone();
+            // Sfondo iniziale coerente con l'aspetto corrente: il frontend lo
+            // riallinea subito dopo con set_window_theme, ma senza questo il
+            // primo frame in dark mode sarebbe chiaro.
+            if let Some(window) = app.get_webview_window("main") {
+                let dark = matches!(window.theme(), Ok(Theme::Dark));
+                let _ = window.set_background_color(Some(window_background(dark)));
+            }
             match store::migrate_legacy(&handle) {
                 Ok(Some(n)) => eprintln!(
                     "[rustnotes] migrate_legacy -> {n} note copiate dalla cartella precedente"
