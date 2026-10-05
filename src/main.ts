@@ -13,15 +13,23 @@ import { applyThemeEarly, applyLocaleEarly } from './stores/settings'
 import { i18n } from './i18n'
 import App from './App.vue'
 
-applyThemeEarly()
-applyLocaleEarly()
+async function bootstrap() {
+  // Il bridge WDIO viene incluso soltanto nella build E2E (`vite --mode e2e`).
+  // La build distribuita non contiene ne' questo modulo ne' i plugin Rust di test.
+  if (import.meta.env.VITE_E2E === 'true') await import('@wdio/tauri-plugin')
 
-const app = createApp(App)
-app.use(createPinia())
-app.use(i18n)
-app.use(PrimeVue, {
-  theme: { preset: RustNotesPreset, options: { darkModeSelector: '.dark-mode', cssLayer: false } },
-})
-app.use(ConfirmationService)
-app.use(ToastService)
-app.mount('#app')
+  applyThemeEarly()
+  applyLocaleEarly()
+
+  const app = createApp(App)
+  app.use(createPinia())
+  app.use(i18n)
+  app.use(PrimeVue, {
+    theme: { preset: RustNotesPreset, options: { darkModeSelector: '.dark-mode', cssLayer: false } }
+  })
+  app.use(ConfirmationService)
+  app.use(ToastService)
+  app.mount('#app')
+}
+
+bootstrap()

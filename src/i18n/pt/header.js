@@ -3,5 +3,6 @@ export default {
   hideFolders: 'Ocultar pastas',
   showFolders: 'Mostrar pastas',
   breadcrumbLabel: 'Localização',
+  editNoteTitle: 'Editar título da nota',
   settings: 'Ajustes (⌘,)'
 }

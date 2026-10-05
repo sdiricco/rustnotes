@@ -107,8 +107,18 @@ pub fn zoom_set_in(default_root: &Path, factor: f64) -> Result<(), String> {
 /// note, si copiano (non si spostano: la vecchia resta come backup finche'
 /// l'utente non la cancella a mano).
 const LEGACY_IDENTIFIER: &str = "com.movesolutions.macnotestauri";
+const PRODUCTION_IDENTIFIER: &str = "io.github.sdiricco.rustnotes";
+
+fn should_migrate_legacy(identifier: &str) -> bool {
+    identifier == PRODUCTION_IDENTIFIER
+}
 
 pub fn migrate_legacy(app: &AppHandle) -> Result<Option<usize>, String> {
+    // Le build Dev/E2E hanno identifier separati: non devono leggere o
+    // copiare note reali solo per popolare un ambiente di test.
+    if !should_migrate_legacy(&app.config().identifier) {
+        return Ok(None);
+    }
     let default = default_root(app)?;
     let Some(parent) = default.parent() else {
         return Ok(None);
@@ -587,6 +597,13 @@ mod tests {
             migrate_legacy_in(&fresh, &parent.path().join("inesistente")).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn la_migrazione_legacy_e_abilitata_solo_per_l_identifier_di_produzione() {
+        assert!(should_migrate_legacy("io.github.sdiricco.rustnotes"));
+        assert!(!should_migrate_legacy("io.github.sdiricco.rustnotes.dev"));
+        assert!(!should_migrate_legacy("io.github.sdiricco.rustnotes.e2e"));
     }
 
     #[test]

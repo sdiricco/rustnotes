@@ -23,7 +23,7 @@ src/                  Vue 3 frontend (JS, Composition API, Pinia, PrimeVue)
   components/         One file per screen area (Sidebar, NoteList, NoteEditor, QuillEditor, SettingsPage, ...)
   stores/             Pinia stores: notes (data + persistence), settings, ui, updateCheck
   utils/              api.js (bridge to Rust), markdown.js (HTML <-> Markdown), exportAll.js, shortcuts.js
-  i18n/               vue-i18n setup + en/ and it/ message files, one per component/domain
+  i18n/               vue-i18n setup + 8 locale trees, one file per component/domain
   test/setup.js       jsdom stubs for vitest
 src-tauri/src/        Rust backend (Tauri v2)
   lib.rs              command registration and app setup
@@ -42,7 +42,8 @@ touching Rust.
 
 ## i18n: adding or changing strings
 
-- Strings live in `src/i18n/en/<domain>.js` and `src/i18n/it/<domain>.js`.
+- Strings live in `src/i18n/<locale>/<domain>.js`. The supported locale trees
+  are `de`, `en`, `es`, `fr`, `it`, `ja`, `pt` and `zh`.
   The domain is the component or area (`list`, `editor`, `settings`, ...). The key
   is `<domain>.<key>`.
 - In components: `const { t } = useI18n()` then `t('list.emptyTrash')`.
@@ -71,15 +72,24 @@ The selector in Settings and the system-locale detection read `LOCALES` in
 
 ```bash
 pnpm install
-pnpm tauri dev          # app with hot reload; Rust changes trigger a rebuild
+pnpm app:dev            # isolated app; Rust changes trigger a rebuild
 pnpm test               # vitest (jsdom)
 pnpm test:watch
-cd src-tauri && cargo test
+pnpm build:e2e          # app desktop di test isolata (mai i dati installati)
+pnpm test:e2e           # smoke: crea, rinomina, modifica e cestina una nota
+pnpm lint               # ESLint for Vue, JavaScript and TypeScript
+pnpm format             # Prettier; use only on files in your change
+pnpm check              # all frontend and Rust checks used by CI
 ```
 
-Data in development goes to the same directory as the packaged app (see the
-README). Back it up or point the app elsewhere before experimenting with the
-storage code.
+`pnpm app:dev` applies `src-tauri/tauri.dev.conf.json`, whose separate app
+identifier isolates notes, configuration and webview storage from the packaged
+app. Do not use plain `pnpm tauri dev`: it uses the production identifier.
+
+Gli E2E usano `io.github.sdiricco.rustnotes.e2e`, la feature Cargo `e2e` e il
+driver embedded di WebdriverIO. La feature non è attiva nelle build di release.
+La stessa suite gira nelle Actions su macOS, Windows e Linux; un risultato verde
+verifica il flusso coperto ma non equivale a un collaudo manuale della piattaforma.
 
 ## Screenshots
 
@@ -103,7 +113,7 @@ release, on each platform you can reach:
 
 - New note, new folder, duplicate, move to folder, trash, restore, empty trash
 - Export note as Markdown, import Markdown, insert image, export all notes
-- Every native menu item, in both languages
+- Every native menu item, in all eight supported languages
 - Cmd/Ctrl+F inside a note opens the in-note find bar; Cmd/Ctrl+Shift+F opens global search
 - Light/dark switch, including the native title bar on macOS
 - Linux: native menu bar and open submenus remain readable in light and dark

@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { v4 as uuid } from 'uuid'
-import { stripHtml, extractTitleFromHtml } from '../utils/markdown'
 import { api } from '../utils/api'
 import { useSettingsStore } from './settings'
 import { t, currentLocale } from '../i18n'
@@ -148,7 +147,7 @@ export const useNotesStore = defineStore('notes', {
       const folder = this.folders[0]
       if (folder) this.renameFolder(folder.id, t('store.notes'))
       const note = this.createNote(folder?.id || null)
-      this.updateNote(note.id, { content: buildWelcomeHtml() })
+      this.updateNote(note.id, { title: t('welcome.title'), content: buildWelcomeHtml() })
     },
 
     selectFolder(folderId) {
@@ -209,11 +208,9 @@ export const useNotesStore = defineStore('notes', {
     updateNote(id, patch) {
       const note = this.notes.find((n) => n.id === id)
       if (!note) return
-      // Niente titolo digitato a mano: quando cambia il contenuto lo deduciamo
-      // dal primo h1/h2/h3 (vuoto se non c'è). Sovrascrive un'eventuale
-      // rinomina manuale precedente, per rispecchiare sempre il contenuto.
-      const finalPatch = 'content' in patch ? { ...patch, title: extractTitleFromHtml(patch.content) } : patch
-      Object.assign(note, finalPatch, { updatedAt: Date.now() })
+      // Il titolo e' un metadato indipendente dal contenuto: modificare il
+      // corpo non deve rinominare la nota in base al primo heading.
+      Object.assign(note, patch, { updatedAt: Date.now() })
       scheduleNoteSave(note)
     },
 
@@ -343,7 +340,11 @@ export const useNotesStore = defineStore('notes', {
     },
 
     createFolder(name) {
-      const folder = { id: uuid(), name: name?.trim() || t('common.newFolder'), createdAt: Date.now() }
+      const folder = {
+        id: uuid(),
+        name: name?.trim() || t('common.newFolder'),
+        createdAt: Date.now()
+      }
       this.folders.push(folder)
       saveFoldersNow(this.folders)
       return folder
@@ -355,8 +356,10 @@ export const useNotesStore = defineStore('notes', {
       const last = this.folders.length - 1
       if (
         fromIndex === toIndex ||
-        fromIndex < 0 || fromIndex > last ||
-        toIndex < 0 || toIndex > last
+        fromIndex < 0 ||
+        fromIndex > last ||
+        toIndex < 0 ||
+        toIndex > last
       ) {
         return
       }

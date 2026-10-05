@@ -3,5 +3,6 @@ export default {
   hideFolders: 'Ordner ausblenden',
   showFolders: 'Ordner einblenden',
   breadcrumbLabel: 'Ort',
+  editNoteTitle: 'Notiztitel bearbeiten',
   settings: 'Einstellungen (⌘,)'
 }

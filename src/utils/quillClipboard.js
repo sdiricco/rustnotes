@@ -41,7 +41,8 @@ export function stripThemeFormats(delta) {
       if (!op.attributes) return op
       const attributes = { ...op.attributes }
       THEME_FORMATS.forEach((name) => delete attributes[name])
-      const { attributes: _drop, ...rest } = op
+      const rest = { ...op }
+      delete rest.attributes
       return Object.keys(attributes).length ? { ...rest, attributes } : rest
     })
   )

@@ -1,6 +1,6 @@
 [package]
 name = "rustnotes"
-version = "0.15.2"
+version = "0.16.0"
 description = "RustNotes: a simple, local-first notes app. Vue frontend, Rust backend (Tauri v2)."
 authors = ["Simone Di Ricco"]
 edition = "2021"
@@ -29,6 +29,13 @@ tokio = { version = "1", features = ["time", "process", "io-util"] }
 sys-locale = "0.3"
 tauri-plugin-updater = "2.13.1"
 tauri-plugin-process = "2.4.0"
+tauri-plugin-wdio = { version = "1", optional = true }
+tauri-plugin-wdio-webdriver = { version = "1", optional = true }
+
+[features]
+# Il server WebDriver embedded non entra mai nelle build distribuite: viene
+# compilato e registrato solo dal comando `pnpm build:e2e`.
+e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
 
 # Solo macOS: barra del titolo alta con NSToolbar vuota (titlebar.rs). Stesse
 # versioni gia' usate da tao, quindi nessuna crate in piu' da compilare.

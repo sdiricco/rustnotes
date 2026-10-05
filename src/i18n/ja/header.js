@@ -3,5 +3,6 @@ export default {
   hideFolders: 'フォルダを隠す',
   showFolders: 'フォルダを表示',
   breadcrumbLabel: '場所',
+  editNoteTitle: 'メモのタイトルを編集',
   settings: '設定 (⌘,)'
 }
