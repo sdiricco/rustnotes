@@ -15,8 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       # Node 22: jsdom (vitest) usa API di undici assenti in Node 20
       # ("webidl.util.markAsUncloneable is not a function").
       - uses: actions/setup-node@v4
