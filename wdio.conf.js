@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.dirname(fileURLToPath(import.meta.url))
 const binaryName = process.platform === 'win32' ? 'rustnotes.exe' : 'rustnotes'
 const appBinaryPath = path.join(root, 'src-tauri', 'target', 'debug', binaryName)
+const isWindows = process.platform === 'win32'
 
 export const config = {
   runner: 'local',
@@ -14,7 +15,9 @@ export const config = {
       'tauri',
       {
         appBinaryPath,
-        driverProvider: 'embedded',
+        driverProvider: isWindows ? 'official' : 'embedded',
+        autoInstallTauriDriver: isWindows,
+        autoDownloadEdgeDriver: isWindows,
         clearMocks: false,
         resetMocks: false,
         restoreMocks: false

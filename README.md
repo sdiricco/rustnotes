@@ -180,9 +180,9 @@ pnpm build:e2e
 pnpm test:e2e
 ```
 
-GitHub Actions runs that same suite on macOS, Windows and Linux. The embedded
-WebDriver server and its bridge are enabled only by the Cargo `e2e` feature and
-are not present in release builds.
+GitHub Actions runs that same suite on macOS, Windows and Linux. The test
+drivers and bridge are enabled only by the Cargo `e2e` feature and are not
+present in release builds.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of the code, how i18n works
 and how to add a language.

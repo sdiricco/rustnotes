@@ -86,8 +86,9 @@ pnpm check              # all frontend and Rust checks used by CI
 identifier isolates notes, configuration and webview storage from the packaged
 app. Do not use plain `pnpm tauri dev`: it uses the production identifier.
 
-Gli E2E usano `io.github.sdiricco.rustnotes.e2e`, la feature Cargo `e2e` e il
-driver embedded di WebdriverIO. La feature non è attiva nelle build di release.
+Gli E2E usano `io.github.sdiricco.rustnotes.e2e`, la feature Cargo `e2e` e
+WebdriverIO (driver embedded su macOS/Linux, `tauri-driver` su Windows). La
+feature non è attiva nelle build di release.
 La stessa suite gira nelle Actions su macOS, Windows e Linux; un risultato verde
 verifica il flusso coperto ma non equivale a un collaudo manuale della piattaforma.
 

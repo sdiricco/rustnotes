@@ -1,8 +1,9 @@
 name: E2E
 
 # Smoke test della vera app desktop e della webview di sistema. Usa un
-# identifier separato e il driver embedded, compilato solo con la feature e2e:
-# nessun dato dell'app installata e nessun server di test nelle release.
+# identifier separato e driver compilati/avviati solo con la feature e2e:
+# embedded su macOS/Linux, tauri-driver ufficiale su Windows. Nessun dato
+# dell'app installata e nessun server di test nelle release.
 on:
   push:
     branches: [main]
