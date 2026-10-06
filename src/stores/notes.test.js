@@ -33,7 +33,11 @@ describe('notes store', () => {
     vi.clearAllMocks()
     api.loadData.mockResolvedValue({
       folders: [{ id: 'f1', name: 'Lavoro', createdAt: 1 }],
-      notes: [note('a', { updatedAt: 3 }), note('b', { folderId: 'f1', updatedAt: 2 }), note('c', { trashed: true })]
+      notes: [
+        note('a', { updatedAt: 3 }),
+        note('b', { folderId: 'f1', updatedAt: 2 }),
+        note('c', { trashed: true })
+      ]
     })
     store = useNotesStore()
     await store.init()
@@ -60,14 +64,19 @@ describe('notes store', () => {
     expect(created.folderId).toBe('f1')
   })
 
-  it('updateNote deduce il titolo dal contenuto e salva con debounce', () => {
+  it('updateNote mantiene il titolo separato dal contenuto e salva con debounce', () => {
     vi.useFakeTimers()
-    store.updateNote('a', { content: '<p>x</p><h2>Nuovo titolo</h2>' })
-    expect(store.notes.find((n) => n.id === 'a').title).toBe('Nuovo titolo')
+    store.updateNote('a', { content: '<p>x</p><h2>Heading nel corpo</h2>' })
+    expect(store.notes.find((n) => n.id === 'a').title).toBe('a')
     expect(api.saveNote).not.toHaveBeenCalled()
     vi.advanceTimersByTime(400)
     expect(api.saveNote).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
+  })
+
+  it('updateNote aggiorna esplicitamente il metadato titolo', () => {
+    store.updateNote('a', { title: 'Titolo scelto' })
+    expect(store.notes.find((n) => n.id === 'a').title).toBe('Titolo scelto')
   })
 
   it('trashNote sposta la selezione sulla nota successiva', () => {

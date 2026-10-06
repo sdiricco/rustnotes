@@ -17,7 +17,6 @@ const PERIODIC_CHECK_MS = 4 * 60 * 60 * 1000
 // fallisce con "Cannot read private member from an object whose class did
 // not declare it".
 let pendingUpdate = null
-let timer = null
 
 export const useUpdateCheckStore = defineStore('updateCheck', {
   state: () => ({
@@ -48,7 +47,7 @@ export const useUpdateCheckStore = defineStore('updateCheck', {
       // in origine: in dev disturberebbe ogni avvio.
       if (import.meta.env.PROD) {
         setTimeout(() => this.check(), FIRST_CHECK_MS)
-        timer = setInterval(() => this.check(), PERIODIC_CHECK_MS)
+        setInterval(() => this.check(), PERIODIC_CHECK_MS)
       }
     },
 
@@ -99,7 +98,7 @@ export const useUpdateCheckStore = defineStore('updateCheck', {
             if (total) this.progress = 0
           } else if (event.event === 'Progress') {
             received += event.data.chunkLength
-            this.receivedMb = Math.round(received / 1024 / 1024 * 10) / 10
+            this.receivedMb = Math.round((received / 1024 / 1024) * 10) / 10
             if (total) this.progress = Math.min(100, Math.round((received / total) * 100))
           } else if (event.event === 'Finished') {
             this.progress = 100

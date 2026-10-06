@@ -30,6 +30,7 @@
 
       <button
         v-if="!store.isTrashView"
+        data-testid="create-note"
         class="icon-btn create-btn"
         :title="t('list.newNote')"
         @click="store.createNote()"
@@ -64,8 +65,18 @@
         >
           <Icon icon="lucide:list-checks" />
         </button>
-        <button class="sort-bar select-mode-btn" :title="t('list.sortAndFilter')" @click="sortMenu.toggle($event)">
-          <Icon :icon="settings.sortDir === 'asc' ? 'lucide:arrow-up-narrow-wide' : 'lucide:arrow-down-wide-narrow'" />
+        <button
+          class="sort-bar select-mode-btn"
+          :title="t('list.sortAndFilter')"
+          @click="sortMenu.toggle($event)"
+        >
+          <Icon
+            :icon="
+              settings.sortDir === 'asc'
+                ? 'lucide:arrow-up-narrow-wide'
+                : 'lucide:arrow-down-wide-narrow'
+            "
+          />
           <span class="sort-current">{{ sortLabel }}</span>
           <span v-if="settings.pinnedOnly" class="sort-filter">
             <Icon icon="lucide:star" /> {{ t('list.pinnedFilter') }}
@@ -100,7 +111,11 @@
         >
           <Icon icon="lucide:trash-2" />
         </button>
-        <button class="icon-btn select-mode-btn" :title="t('list.cancelSelection')" @click="exitSelectionMode">
+        <button
+          class="icon-btn select-mode-btn"
+          :title="t('list.cancelSelection')"
+          @click="exitSelectionMode"
+        >
           <Icon icon="lucide:x" />
         </button>
       </template>
@@ -132,18 +147,43 @@
             @update:model-value="toggleNoteSelected(note.id)"
           />
           <Icon v-if="note.pinned" icon="lucide:star" class="pin-icon" />
-          <input
+          <InputText
             v-if="renamingId === note.id"
             ref="renameInput"
             v-model="renameValue"
             class="rename-input"
+            data-testid="note-title-input"
             @click.stop
-            @keyup.enter="commitRename(note)"
-            @keyup.esc="renamingId = null"
+            @keydown.enter.prevent="commitRename(note)"
+            @keydown.esc.prevent="cancelRename"
             @blur="commitRename(note)"
           />
-          <span v-else class="note-title">{{ note.title || t('common.untitledNote') }}</span>
-          <button v-if="!selectionMode" class="kebab" :title="t('list.actions')" @click.stop="openMenu($event, note)">
+          <button
+            v-else
+            type="button"
+            class="note-title"
+            :data-note-title="note.title"
+            :title="t('list.menu.rename')"
+            @click.stop="startRename(note)"
+          >
+            {{ note.title || t('common.untitledNote') }}
+          </button>
+          <button
+            v-if="!selectionMode && renamingId !== note.id"
+            type="button"
+            class="rename-btn"
+            :title="t('list.menu.rename')"
+            :aria-label="t('list.menu.rename')"
+            @click.stop="startRename(note)"
+          >
+            <Icon icon="lucide:pencil" />
+          </button>
+          <button
+            v-if="!selectionMode"
+            class="kebab"
+            :title="t('list.actions')"
+            @click.stop="openMenu($event, note)"
+          >
             <Icon icon="lucide:ellipsis" />
           </button>
         </div>
@@ -208,6 +248,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import Menu from 'primevue/menu'
 import Checkbox from 'primevue/checkbox'
+import InputText from 'primevue/inputtext'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { Icon } from '@iconify/vue'
@@ -276,8 +317,16 @@ const noteMenuItems = computed(() => {
   if (!note) return []
   if (note.trashed) {
     return [
-      { label: t('list.menu.restore'), icon: 'lucide:rotate-ccw', command: () => store.restoreNote(note.id) },
-      { label: t('list.selectNotes'), icon: 'lucide:list-checks', command: () => startSelectionFrom(note) },
+      {
+        label: t('list.menu.restore'),
+        icon: 'lucide:rotate-ccw',
+        command: () => store.restoreNote(note.id)
+      },
+      {
+        label: t('list.selectNotes'),
+        icon: 'lucide:list-checks',
+        command: () => startSelectionFrom(note)
+      },
       {
         label: t('list.deletePermanently'),
         icon: 'lucide:trash-2',
@@ -288,16 +337,28 @@ const noteMenuItems = computed(() => {
   }
   return [
     { label: t('list.menu.rename'), icon: 'lucide:pencil', command: () => startRename(note) },
-    { label: t('list.menu.duplicate'), icon: 'lucide:copy-plus', command: () => store.duplicateNote(note.id) },
+    {
+      label: t('list.menu.duplicate'),
+      icon: 'lucide:copy-plus',
+      command: () => store.duplicateNote(note.id)
+    },
     { label: t('list.menu.copyText'), icon: 'lucide:clipboard', command: () => copyText(note) },
-    { label: t('list.menu.copyMarkdown'), icon: 'lucide:clipboard-list', command: () => copyMarkdown(note) },
+    {
+      label: t('list.menu.copyMarkdown'),
+      icon: 'lucide:clipboard-list',
+      command: () => copyMarkdown(note)
+    },
     { separator: true },
     {
       label: note.pinned ? t('list.menu.removeFromPinned') : t('list.menu.addToPinned'),
       icon: 'lucide:star',
       command: () => store.togglePin(note.id)
     },
-    { label: t('list.selectNotes'), icon: 'lucide:list-checks', command: () => startSelectionFrom(note) },
+    {
+      label: t('list.selectNotes'),
+      icon: 'lucide:list-checks',
+      command: () => startSelectionFrom(note)
+    },
     {
       label: t('list.moveToTrash'),
       icon: 'lucide:trash-2',
@@ -316,14 +377,34 @@ const noteMenuItems = computed(() => {
 const moveMenuItems = computed(() => folderTargetItems([...selectedIds]))
 
 const sortMenuItems = computed(() => [
-  { label: t('list.sort.updated'), icon: 'lucide:clock', sortKey: 'updated', command: () => settings.setSort('updated') },
-  { label: t('list.sort.created'), icon: 'lucide:calendar', sortKey: 'created', command: () => settings.setSort('created') },
-  { label: t('list.sort.title'), icon: 'lucide:case-sensitive', sortKey: 'title', command: () => settings.setSort('title') },
+  {
+    label: t('list.sort.updated'),
+    icon: 'lucide:clock',
+    sortKey: 'updated',
+    command: () => settings.setSort('updated')
+  },
+  {
+    label: t('list.sort.created'),
+    icon: 'lucide:calendar',
+    sortKey: 'created',
+    command: () => settings.setSort('created')
+  },
+  {
+    label: t('list.sort.title'),
+    icon: 'lucide:case-sensitive',
+    sortKey: 'title',
+    command: () => settings.setSort('title')
+  },
   ...(store.isPinnedView
     ? []
     : [
         { separator: true },
-        { label: t('list.sort.pinnedOnly'), icon: 'lucide:star', filter: true, command: () => settings.togglePinnedOnly() }
+        {
+          label: t('list.sort.pinnedOnly'),
+          icon: 'lucide:star',
+          filter: true,
+          command: () => settings.togglePinnedOnly()
+        }
       ])
 ])
 
@@ -336,12 +417,19 @@ function startRename(note) {
   store.selectNote(note.id)
   renamingId.value = note.id
   renameValue.value = note.title || ''
-  nextTick(() => renameInput.value?.[0]?.focus())
+  nextTick(() => {
+    const input = renameInput.value?.[0]
+    ;(input?.$el || input)?.focus?.()
+  })
 }
 
 function commitRename(note) {
   if (renamingId.value !== note.id) return
   store.updateNote(note.id, { title: renameValue.value.trim() })
+  renamingId.value = null
+}
+
+function cancelRename() {
   renamingId.value = null
 }
 
@@ -409,9 +497,12 @@ function selectAllVisible() {
 // Checkbox "seleziona tutte" a 3 stati (vuota/indeterminata/piena): click
 // seleziona tutte se non lo sono già, altrimenti deseleziona tutte.
 const allVisibleSelected = computed(
-  () => store.visibleNotes.length > 0 && store.visibleNotes.every((note) => selectedIds.has(note.id))
+  () =>
+    store.visibleNotes.length > 0 && store.visibleNotes.every((note) => selectedIds.has(note.id))
 )
-const someVisibleSelected = computed(() => store.visibleNotes.some((note) => selectedIds.has(note.id)))
+const someVisibleSelected = computed(() =>
+  store.visibleNotes.some((note) => selectedIds.has(note.id))
+)
 
 function toggleSelectAll() {
   if (allVisibleSelected.value) selectedIds.clear()
@@ -454,8 +545,6 @@ function confirmBulkDelete() {
 // di note non più visibili: si esce dalla modalità invece di trascinare uno
 // stato ambiguo tra viste diverse.
 watch(() => store.selectedFolderId, exitSelectionMode)
-
-
 
 // Esposta ad App.vue per la voce di menu ⇧⌘F.
 defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
@@ -526,7 +615,6 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 
 .selection-count {
   font-size: 13px;
@@ -683,9 +771,36 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
   font-weight: 600;
   font-size: 13px;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  border: 0;
+  padding: 2px 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-family: inherit;
+  cursor: text;
+}
+
+.rename-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: 5px;
+  padding: 3px;
+  background: transparent;
+  color: var(--icon-color);
+  cursor: pointer;
+}
+.rename-btn:hover {
+  background: var(--selection-bg);
+  color: var(--p-text-color);
+}
+.rename-btn :deep(svg) {
+  font-size: 12px;
 }
 
 .kebab {
@@ -719,13 +834,10 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
 
 .rename-input {
   flex: 1;
-  background: var(--p-content-background);
-  border: 1px solid var(--p-content-border-color);
-  border-radius: 4px;
+  min-width: 0;
+  height: 32px;
   font-size: 13px;
-  padding: 1px 5px;
-  color: var(--p-text-color);
-  outline: none;
+  padding: 5px 9px;
 }
 
 .note-meta {
@@ -805,5 +917,4 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
   letter-spacing: 0.03em;
   color: var(--p-text-muted-color);
 }
-
 </style>

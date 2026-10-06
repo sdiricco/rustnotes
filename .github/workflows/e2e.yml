@@ -1,0 +1,49 @@
+name: E2E
+
+# Smoke test della vera app desktop e della webview di sistema. Usa un
+# identifier separato e driver compilati/avviati solo con la feature e2e:
+# embedded su macOS/Linux, tauri-driver ufficiale su Windows. Nessun dato
+# dell'app installata e nessun server di test nelle release.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  notes-smoke:
+    name: Notes smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Dipendenze Tauri (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb
+
+      - run: pnpm install --frozen-lockfile
+      - name: Build app E2E isolata
+        run: pnpm build:e2e
+
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm test:e2e
+      - name: Smoke test (macOS/Windows)
+        if: runner.os != 'Linux'
+        run: pnpm test:e2e

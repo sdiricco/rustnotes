@@ -25,17 +25,25 @@
              fallendo con "emitsOptions null" e impedendo il montaggio di
              QuillEditor (toolbar vuota). Disponibile da Vue 3.5. -->
         <Teleport defer to="#header-note-actions">
-        <div class="action-card">
+          <div class="action-card">
             <!-- Azioni Claude (claudeActions.js): il pulsante c'e' solo se la
                  CLI di Claude Code e' installata e l'utente non l'ha nascosta
                  in Impostazioni. Il menu dice su cosa agisce (selezione o
                  nota) e, se manca l'accesso, rimanda a Impostazioni. -->
-            <button class="icon-btn" :title="t('editor.findInNote', { shortcut: shortcut('mod+F') })" @click="quillEditorRef?.toggleFindBar()">
+            <button
+              class="icon-btn"
+              :title="t('editor.findInNote', { shortcut: shortcut('mod+F') })"
+              @click="quillEditorRef?.toggleFindBar()"
+            >
               <Icon icon="lucide:search" />
             </button>
             <button
               class="icon-btn"
-              :title="store.selectedNote.pinned ? t('editor.removeFromFavorites') : t('editor.addToFavorites')"
+              :title="
+                store.selectedNote.pinned
+                  ? t('editor.removeFromFavorites')
+                  : t('editor.addToFavorites')
+              "
               @click="store.togglePin(store.selectedNote.id)"
             >
               <Icon icon="lucide:star" :class="{ filled: store.selectedNote.pinned }" />
@@ -43,39 +51,51 @@
             <button
               v-if="!store.selectedNote.trashed"
               class="icon-btn"
+              data-testid="trash-note"
               :title="t('editor.moveToTrash')"
               @click="moveToTrash"
             >
               <Icon icon="lucide:trash-2" />
             </button>
-            <button v-else class="icon-btn" :title="t('editor.restore')" @click="store.restoreNote(store.selectedNote.id)">
+            <button
+              v-else
+              class="icon-btn"
+              :title="t('editor.restore')"
+              @click="store.restoreNote(store.selectedNote.id)"
+            >
               <Icon icon="lucide:rotate-ccw" />
             </button>
 
-          <div ref="actionOverflowEl" class="action-overflow">
-            <button class="icon-btn" :title="t('editor.moreActions')" @click="actionMenuOpen = !actionMenuOpen">
-              <Icon icon="lucide:ellipsis" />
-            </button>
-            <div v-if="actionMenuOpen" class="action-overflow-menu">
-              <button @click="importNote(); actionMenuOpen = false">
-                <Icon icon="lucide:upload" />
-                <span>{{ t('editor.importMarkdown') }}</span>
+            <div ref="actionOverflowEl" class="action-overflow">
+              <button
+                class="icon-btn"
+                :title="t('editor.moreActions')"
+                @click="actionMenuOpen = !actionMenuOpen"
+              >
+                <Icon icon="lucide:ellipsis" />
               </button>
-              <button @click="openMarkdownPreview(); actionMenuOpen = false">
-                <Icon icon="lucide:file-code" />
-                <span>{{ t('editor.markdownMenu') }}</span>
-              </button>
-              <button @click="settings.toggleSpellcheck()">
-                <Icon icon="lucide:spell-check" />
-                <span>{{ settings.spellcheck ? t('editor.spellcheckOn') : t('editor.spellcheckOff') }}</span>
-              </button>
-              <button @click="api.revealDataFile(); actionMenuOpen = false">
-                <Icon icon="lucide:folder-open" />
-                <span>{{ t('editor.revealInFinder', isMac ? 1 : 2) }}</span>
-              </button>
+              <div v-if="actionMenuOpen" class="action-overflow-menu">
+                <button @click="(importNote(), (actionMenuOpen = false))">
+                  <Icon icon="lucide:upload" />
+                  <span>{{ t('editor.importMarkdown') }}</span>
+                </button>
+                <button @click="(openMarkdownPreview(), (actionMenuOpen = false))">
+                  <Icon icon="lucide:file-code" />
+                  <span>{{ t('editor.markdownMenu') }}</span>
+                </button>
+                <button @click="settings.toggleSpellcheck()">
+                  <Icon icon="lucide:spell-check" />
+                  <span>{{
+                    settings.spellcheck ? t('editor.spellcheckOn') : t('editor.spellcheckOff')
+                  }}</span>
+                </button>
+                <button @click="(api.revealDataFile(), (actionMenuOpen = false))">
+                  <Icon icon="lucide:folder-open" />
+                  <span>{{ t('editor.revealInFinder', isMac ? 1 : 2) }}</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
         </Teleport>
       </div>
 
@@ -110,7 +130,13 @@
         :on-selection="Boolean(assistant?.range)"
         :ready="claude.ready"
         :run="claudeRun"
-        @action="(a) => startClaude(buildInstruction(a, assistant), { action: a, label: t(`editor.claude.actions.${a.id}`) })"
+        @action="
+          (a) =>
+            startClaude(buildInstruction(a, assistant), {
+              action: a,
+              label: t(`editor.claude.actions.${a.id}`)
+            })
+        "
         @ask="(q) => startClaude(buildFree(q, assistant), { action: null, label: q })"
         @refine="refineClaude"
         @retry="retryClaude"
@@ -118,7 +144,7 @@
         @insert="applyClaude('insert')"
         @copy="copyClaude"
         @close="closeAssistant"
-        @settings="ui.openSettings('claude'); closeAssistant()"
+        @settings="(ui.openSettings('claude'), closeAssistant())"
       />
 
       <Dialog
@@ -203,7 +229,11 @@ const listPickerCss = computed(() => {
 })
 
 function onGlobalMousedown(event) {
-  if (actionMenuOpen.value && actionOverflowEl.value && !actionOverflowEl.value.contains(event.target)) {
+  if (
+    actionMenuOpen.value &&
+    actionOverflowEl.value &&
+    !actionOverflowEl.value.contains(event.target)
+  ) {
     actionMenuOpen.value = false
   }
 }
@@ -230,7 +260,10 @@ onMounted(() => {
 })
 
 // Cambio nota: il pannello si riferiva a un'altra nota.
-watch(() => store.selectedNote?.id, () => closeAssistant())
+watch(
+  () => store.selectedNote?.id,
+  () => closeAssistant()
+)
 
 // Testo di partenza per `range` (null = tutta la nota): { range, inline, source }.
 function claudeScope(range) {
@@ -335,7 +368,10 @@ async function startClaude(instruction, { action, label }) {
 function refineClaude(refinement) {
   const prev = claudeRun.value
   if (!prev?.text || !assistant.value) return
-  startClaude(buildFollowUp(refinement, prev.text, assistant.value), { action: prev.action, label: refinement })
+  startClaude(buildFollowUp(refinement, prev.text, assistant.value), {
+    action: prev.action,
+    label: refinement
+  })
 }
 
 function retryClaude() {
@@ -539,7 +575,9 @@ async function copyNote() {
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(124, 92, 255, 0.35);
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
 }
 .claude-fab:hover {
   transform: scale(1.06);
@@ -699,7 +737,6 @@ async function copyNote() {
 .floating-toolbar::-webkit-scrollbar {
   display: none;
 }
-
 
 .floating-toolbar :deep(.ql-formats) {
   display: inline-flex;

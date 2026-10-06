@@ -1,7 +1,7 @@
 name: CI
 
-# Controlli veloci su ogni push e pull request: typecheck del frontend, test
-# JS, `cargo test` e `cargo fmt --check` del backend. Il bundle completo
+# Controlli veloci su ogni push e pull request: lint, typecheck, build e test
+# del frontend; `cargo fmt`, Clippy e test del backend. Il bundle completo
 # (installer per ogni OS) resta nel workflow di release, che parte solo sui
 # tag: qui basta sapere che il codice compila e i test passano.
 on:
@@ -15,8 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       # Node 22: jsdom (vitest) usa API di undici assenti in Node 20
       # ("webidl.util.markAsUncloneable is not a function").
       - uses: actions/setup-node@v4
@@ -24,6 +22,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
       - name: Typecheck
         run: pnpm exec vue-tsc --noEmit
       - name: Test

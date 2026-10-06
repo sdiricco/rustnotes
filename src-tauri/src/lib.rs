@@ -158,7 +158,13 @@ pub fn run() {
     // Prima di creare la webview: WebKit legge lo stato una volta sola.
     spellcheck::enable();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(feature = "e2e")]
+    let builder = builder.plugin(tauri_plugin_wdio::init());
+    #[cfg(feature = "e2e")]
+    let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         // Aggiornamento in-app: `latest.json` firmato (minisign) su GitHub

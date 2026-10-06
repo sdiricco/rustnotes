@@ -95,6 +95,7 @@
     <div class="grid">
       <div class="card"><h3>Rich text, no fuss</h3><p>Headings, lists, checklists, tables, images and code blocks with syntax highlighting.</p></div>
       <div class="card"><h3>Folders, favorites, trash</h3><p>Multi-select, drag to reorder, instant full-text search across every note.</p></div>
+      <div class="card"><h3>Titles that stay yours</h3><p>The title is note metadata, independent from its body. Edit it directly in the list or in the header.</p></div>
       <div class="card"><h3>Markdown in and out</h3><p>Import a .md file, export one note or your whole library as Markdown files.</p></div>
       <div class="card"><h3>Eight languages</h3><p>English, Italian, Spanish, French, German, Portuguese, Chinese, Japanese. Follows your system.</p></div>
       <div class="card"><h3>Light and dark</h3><p>Follows your system, or pick one. Zoom the whole interface from the View menu.</p></div>
@@ -111,7 +112,7 @@
     <h2>Your data is a folder.</h2>
     <p class="kicker">One JSON file per note, on your disk, in a folder you can move.</p>
     <div class="two">
-      <div class="card"><h3>No account, no server</h3><p>RustNotes never phones home, except for one anonymous request to GitHub to check for a newer version. The optional Claude assistant sends only the text you hand it, through your own Claude Code login. There is nothing to sign up for and nothing to lose access to.</p></div>
+      <div class="card"><h3>No account, no server</h3><p>RustNotes contacts GitHub Releases to check for updates and, only when you choose Update, download one. The optional Claude assistant sends only the text you hand it, through your own Claude Code login. There is nothing to sign up for and nothing to lose access to.</p></div>
       <div class="card"><h3>Sync the way you already do</h3><p>Point the notes folder at iCloud Drive, Dropbox or Syncthing from Settings and use the same notes on every computer. A second machine pointed at the same folder simply adopts it.</p></div>
     </div>
   </section>
@@ -125,8 +126,9 @@ brew install --cask sdiricco/rustnotes/rustnotes</pre>
     <div style="height:28px"></div>
     <h2 style="font-size:20px">The honest part</h2>
     <ul class="honest">
-      <li><strong>The app is not code-signed.</strong> Certificates cost money every year and RustNotes is free and stays free. On macOS, right-click the app → Open the first time, or run <code>xattr -dr com.apple.quarantine "/Applications/RustNotes.app"</code>. Windows shows a SmartScreen warning.</li>
-      <li><strong>Windows and Linux builds are produced by CI but not yet tested by a human.</strong> They compile, they should run, and bug reports with screenshots are very welcome.</li>
+      <li><strong>macOS builds are signed and notarized by Apple.</strong> They open normally. Windows installers are not code-signed, so SmartScreen may show a warning on first launch.</li>
+      <li><strong>Updates can be installed in the app.</strong> RustNotes checks GitHub Releases and shows an Update button when a newer signed build is available. Homebrew and Linux package-manager installs can still be updated with their usual commands.</li>
+      <li><strong>Windows and Linux are not yet tested by a human.</strong> CI builds them and runs a desktop smoke test that creates, renames, edits and trashes a note on macOS, Windows and Linux. That is useful coverage, not a substitute for manual testing; bug reports with screenshots are very welcome.</li>
       <li><strong>The Claude assistant needs Claude Code installed and signed in</strong>, and uses your Claude subscription. Without it the button is simply not there. Notes with images or tables go through Markdown on the way to Claude: prefer working on a selection there.</li>
       <li><strong>This is a 0.x release.</strong> It is used daily on macOS by its author. Treat it as a public beta elsewhere.</li>
     </ul>

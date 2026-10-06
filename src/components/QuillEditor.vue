@@ -1380,9 +1380,10 @@ onMounted(async () => {
   await nextTick()
 
   let toolbarContainer = toolbarOptions
-  if (props.toolbarContainer) {
-    props.toolbarContainer.innerHTML = TOOLBAR_HTML
-    toolbarContainer = props.toolbarContainer
+  const externalToolbar = props.toolbarContainer
+  if (externalToolbar) {
+    externalToolbar.innerHTML = TOOLBAR_HTML
+    toolbarContainer = externalToolbar
   }
 
   quill = new Quill(editorEl.value, {

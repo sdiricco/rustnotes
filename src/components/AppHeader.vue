@@ -29,7 +29,38 @@
         </span>
         <template v-if="store.selectedNote">
           <Icon icon="lucide:chevron-right" class="crumb-sep" />
-          <span class="crumb crumb-note" :title="noteTitle">{{ noteTitle }}</span>
+          <span class="crumb crumb-note" :title="noteTitle" data-tauri-drag-region="false">
+            <InputText
+              v-if="editingTitle"
+              ref="titleInput"
+              v-model="titleDraft"
+              class="title-input"
+              data-testid="header-title-input"
+              @click.stop
+              @keydown.enter.prevent="commitTitle"
+              @keydown.esc.prevent="cancelTitle"
+              @blur="commitTitle"
+            />
+            <button
+              v-else
+              class="title-label"
+              type="button"
+              data-testid="header-title"
+              @click.stop="startTitleEdit"
+            >
+              {{ noteTitle }}
+            </button>
+            <button
+              v-if="!editingTitle"
+              class="title-edit"
+              type="button"
+              :title="t('header.editNoteTitle')"
+              :aria-label="t('header.editNoteTitle')"
+              @click.stop="startTitleEdit"
+            >
+              <Icon icon="lucide:pencil" />
+            </button>
+          </span>
         </template>
       </nav>
     </div>
@@ -51,8 +82,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import InputText from 'primevue/inputtext'
 import { useI18n } from 'vue-i18n'
 import { useNotesStore } from '../stores/notes'
 import { useUiStore } from '../stores/ui'
@@ -70,7 +102,31 @@ const ui = useUiStore()
 const { t } = useI18n()
 
 const noteTitle = computed(() => store.selectedNote?.title?.trim() || t('common.untitledNote'))
+const editingTitle = ref(false)
+const titleDraft = ref('')
+const titleInput = ref(null)
 
+function startTitleEdit() {
+  if (!store.selectedNote) return
+  titleDraft.value = store.selectedNote.title || ''
+  editingTitle.value = true
+  nextTick(() => (titleInput.value?.$el || titleInput.value)?.focus?.())
+}
+
+function commitTitle() {
+  if (!editingTitle.value || !store.selectedNote) return
+  store.updateNote(store.selectedNote.id, { title: titleDraft.value.trim() })
+  editingTitle.value = false
+}
+
+function cancelTitle() {
+  editingTitle.value = false
+}
+
+watch(
+  () => store.selectedNote?.id,
+  () => cancelTitle()
+)
 </script>
 
 <style scoped>
@@ -182,11 +238,52 @@ const noteTitle = computed(() => store.selectedNote?.title?.trim() || t('common.
 /* La nota e' l'ultimo segmento e l'unico che si tronca, essendo l'unico di
    lunghezza imprevedibile. */
 .crumb-note {
+  flex: 1;
   min-width: 0;
   color: var(--p-text-muted-color);
   white-space: nowrap;
+}
+
+.title-label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 0;
+  padding: 3px 2px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.title-edit {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: 5px;
+  padding: 4px;
+  background: transparent;
+  color: var(--icon-color);
+  cursor: pointer;
+}
+.title-edit:hover {
+  background: var(--sidebar-hover-bg);
+  color: var(--p-text-color);
+}
+.title-edit :deep(svg) {
+  font-size: 12px;
+}
+
+.title-input {
+  width: min(360px, 42vw);
+  min-width: 180px;
+  height: 30px;
+  padding: 5px 9px;
+  font-size: 13px;
 }
 
 /* Pannello cartelle: largo quanto serve alle voci, non 360px come quello

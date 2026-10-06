@@ -9,8 +9,8 @@ name: Release
 # le librerie di sistema di webkit2gtk/GTK sono un incubo da cross-compilare,
 # un runner con l'hardware giusto evita il problema alla radice).
 #
-# macOS e Linux sono stati provati manualmente; Windows (WebView2) resta
-# verificato dalla compilazione automatica, senza una prova manuale.
+# Solo macOS e' testato manualmente. Windows (WebView2) e Linux sono verificati
+# dalla compilazione automatica, senza una prova manuale.
 on:
   push:
     tags:
@@ -26,8 +26,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -72,8 +70,8 @@ jobs:
             Windows: installer non firmato, SmartScreen puo' mostrare un avviso
             al primo avvio ("Ulteriori informazioni" > "Esegui comunque").
 
-            macOS e Linux: provati manualmente. Windows: compilato
-            automaticamente ma non ancora testato a mano su questo progetto.
+            macOS: testato manualmente. Windows e Linux: compilati
+            automaticamente ma non ancora testati a mano su questo progetto.
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
@@ -93,8 +91,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -136,8 +132,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:

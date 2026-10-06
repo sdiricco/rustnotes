@@ -1,5 +1,11 @@
 # RustNotes
 
+[![CI](https://github.com/sdiricco/rustnotes/actions/workflows/ci.yml/badge.svg)](https://github.com/sdiricco/rustnotes/actions/workflows/ci.yml)
+[![E2E](https://github.com/sdiricco/rustnotes/actions/workflows/e2e.yml/badge.svg)](https://github.com/sdiricco/rustnotes/actions/workflows/e2e.yml)
+![macOS tested](https://img.shields.io/badge/macOS-tested-success)
+![Windows not manually tested](https://img.shields.io/badge/Windows-not_manually_tested-orange)
+![Linux not manually tested](https://img.shields.io/badge/Linux-not_manually_tested-orange)
+
 A simple, local-first notes app in the spirit of Apple Notes, for macOS, Windows and Linux.
 Free and open source (MIT), no account, no cloud, no telemetry: your notes are files on your disk.
 
@@ -22,6 +28,7 @@ Free and open source (MIT), no account, no cloud, no telemetry: your notes are f
 ## Features
 
 - Folders, favorites, trash, multi-select, drag to reorder folders
+- Titles are note metadata, independent from the note body, and editable from the list or header
 - Rich text editor (Quill) with headings, lists, checklists, code blocks with syntax highlighting, tables, images
 - Instant full-text search across all notes, find inside a note
 - Markdown import and export, per note or **all notes at once**
@@ -97,9 +104,10 @@ at startup (external disk unplugged) the app falls back to the default one.
 To get everything out as plain Markdown: Settings → About → **Export all notes**.
 It writes one `.md` file per note, one subfolder per folder.
 
-Nothing ever leaves your machine except one anonymous `GET` to the GitHub Releases
-API to check for a newer version, and the text you explicitly send to the Claude
-assistant if you use it (next section). The full statement is in
+Nothing ever leaves your machine except requests to GitHub Releases to check for
+updates and, only when you press *Update*, download the signed update; plus the
+text you explicitly send to the Claude assistant if you use it (next section).
+The full statement is in
 [PRIVACY.md](PRIVACY.md).
 
 ## Claude assistant (optional)
@@ -129,13 +137,13 @@ with images or tables prefer working on a selection.
 
 Documented rather than hidden. Decisions, not oversights:
 
-- **Not code-signed** (macOS Gatekeeper / Windows SmartScreen warnings). Certificates
-  cost money every year; the project is free and stays free. Instructions above.
-- **Windows and Linux are untested by a human.** They compile in CI. The header
+- **Windows is not code-signed**, so SmartScreen may warn on first launch.
+  macOS builds are signed with a Developer ID and notarized by Apple.
+- **Windows and Linux are untested by a human.** They compile in CI and a desktop
+  smoke test creates, renames, edits and trashes a note on all three operating
+  systems. This is useful coverage, not a substitute for a real person. The header
   leaves room on the left for the macOS window buttons and may show an empty
   strip on other OSes. Reports and screenshots are very welcome.
-- **No auto-update** outside Homebrew. A minisign-based updater (no certificate
-  needed) is on the list.
 - **No sync of its own.** By design there is no account or server. Put the notes
   folder inside iCloud Drive, Dropbox or Syncthing (see *Your data*). Two
   computers editing the same note at the same time will conflict the way any
@@ -147,21 +155,34 @@ Documented rather than hidden. Decisions, not oversights:
 
 ## Development
 
-Requirements: Node 20+, pnpm 10, Rust stable, and the
+Requirements: Node 22+, pnpm 10, Rust stable, and the
 [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS.
 
 ```bash
 pnpm install
-pnpm tauri dev
+pnpm app:dev             # isolated development app; never touches installed-app data
 ```
 
-Tests and checks (the same ones CI runs on every push and pull request):
+Run all checks used by CI with one command:
 
 ```bash
-pnpm exec vue-tsc --noEmit   # typecheck
-pnpm test                    # frontend unit tests (vitest)
-cd src-tauri && cargo test && cargo clippy --all-targets -- -D warnings && cargo fmt --check
+pnpm check
 ```
+
+`pnpm app:dev` uses the separate `io.github.sdiricco.rustnotes.dev` identifier,
+so its notes, configuration and webview storage are isolated from the installed
+app. `pnpm dev` runs only the Vite frontend and is also safe for UI work.
+
+The desktop smoke suite uses another isolated identifier and a test-only binary:
+
+```bash
+pnpm build:e2e
+pnpm test:e2e
+```
+
+GitHub Actions runs that same suite on macOS, Windows and Linux. The test
+drivers and bridge are enabled only by the Cargo `e2e` feature and are not
+present in release builds.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of the code, how i18n works
 and how to add a language.

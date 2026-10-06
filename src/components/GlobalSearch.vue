@@ -175,7 +175,8 @@ function close() {
 }
 
 function toggle() {
-  panelOpen.value ? close() : openSearch()
+  if (panelOpen.value) close()
+  else openSearch()
 }
 
 function clearQuery() {
