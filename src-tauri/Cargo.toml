@@ -30,16 +30,16 @@ sys-locale = "0.3"
 tauri-plugin-updater = "2.13.1"
 tauri-plugin-process = "2.4.0"
 tauri-plugin-wdio = { version = "1", optional = true }
+# Commit upstream che rende il plugin embedded compatibile sia con il
+# webview2-com di Tauri 2.12 sia con le versioni precedenti. Rimuovere il pin
+# quando la correzione https://github.com/webdriverio/desktop-mobile/pull/687
+# sara' inclusa in una release crates.io.
+tauri-plugin-wdio-webdriver = { git = "https://github.com/webdriverio/desktop-mobile", rev = "fb4a544", optional = true }
 
 [features]
 # Il server WebDriver embedded non entra mai nelle build distribuite: viene
 # compilato e registrato solo dal comando `pnpm build:e2e`.
 e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
-
-# Su Windows il plugin embedded 1.4 non e' ancora compatibile con il
-# webview2-com usato da Tauri 2.12; li' gli E2E usano tauri-driver ufficiale.
-[target.'cfg(not(target_os = "windows"))'.dependencies]
-tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 
 # Solo macOS: barra del titolo alta con NSToolbar vuota (titlebar.rs). Stesse
 # versioni gia' usate da tao, quindi nessuna crate in piu' da compilare.

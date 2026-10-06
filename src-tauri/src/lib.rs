@@ -161,7 +161,7 @@ pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(feature = "e2e")]
     let builder = builder.plugin(tauri_plugin_wdio::init());
-    #[cfg(all(feature = "e2e", not(target_os = "windows")))]
+    #[cfg(feature = "e2e")]
     let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
 
     builder
