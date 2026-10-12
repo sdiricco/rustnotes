@@ -1,6 +1,6 @@
 <template>
-  <div class="quill-editor">
-    <div ref="editorEl"></div>
+  <div ref="quillEditorEl" class="quill-editor">
+    <div v-show="!codeEditor.visible" ref="editorEl"></div>
 
     <!-- Cerca nella nota (Cmd+F): evidenzia i risultati con un formato Quill
          dedicato (vedi SearchHighlightBlot) invece di un overlay posizionato
@@ -174,6 +174,39 @@
         </div>
       </div>
     </div>
+
+    <CodeBlockEditor
+      v-if="codeEditor.visible"
+      :code="codeEditor.code"
+      :initial-language="codeEditor.language"
+      :languages="CODE_LANGUAGES"
+      @save="saveCodeBlock"
+      @cancel="closeCodeBlockEditor"
+    />
+
+    <div
+      v-if="codeCopy.visible && !codeEditor.visible"
+      class="code-block-actions"
+      :style="codeCopy.position"
+      @mouseleave="onCodeCopyButtonLeave"
+    >
+      <button
+        type="button"
+        :title="t('quill.contextMenu.copy')"
+        @mousedown.prevent.stop
+        @click.stop="copyCodeBlock"
+      >
+        <Icon icon="lucide:copy" />
+      </button>
+      <button
+        type="button"
+        :title="t('quill.codeEditor.title')"
+        @mousedown.prevent.stop
+        @click.stop="openCodeBlockFromActions"
+      >
+        <Icon icon="lucide:maximize-2" />
+      </button>
+    </div>
   </div>
 
   <!-- Il bottone che apre questo overlay vive fuori dal template di questo
@@ -236,7 +269,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import Quill from 'quill'
 import hljs from 'highlight.js/lib/common'
 import 'quill/dist/quill.snow.css'
@@ -256,6 +289,10 @@ const settings = useSettingsStore()
 const toast = useToast()
 const { t, locale } = useI18n()
 
+// CodeMirror e i parser dei linguaggi pesano più del semplice renderer Quill:
+// il chunk viene scaricato soltanto alla prima apertura dell'editor esteso.
+const CodeBlockEditor = defineAsyncComponent(() => import('./CodeBlockEditor.vue'))
+
 const props = defineProps({
   noteId: { type: String, default: null },
   content: { type: String, default: '' },
@@ -268,8 +305,22 @@ const props = defineProps({
 const emit = defineEmits(['change', 'claude', 'selection'])
 
 const editorEl = ref(null)
+const quillEditorEl = ref(null)
 let quill = null
 let internalUpdate = false
+
+// Il blocco resta un formato Quill quando e' chiuso, quindi continua a
+// partecipare normalmente a salvataggio, Markdown e ricerca. Il pulsante
+// espandi ne copia il range nell'editor a tutto schermo; al salvataggio lo
+// sostituiamo con un singolo Delta, così Undo resta una sola operazione.
+const codeEditor = reactive({
+  visible: false,
+  index: 0,
+  length: 0,
+  code: '',
+  language: 'plain'
+})
+const codeCopy = reactive({ visible: false, container: null, position: {} })
 
 // Formati dedicati alla ricerca (Cmd+F): applicati/rimossi con source
 // 'silent' così non finiscono nel contenuto salvato né nella cronologia
@@ -989,6 +1040,101 @@ function openableUrl(href) {
   }
 }
 
+function openCodeBlockEditor(container) {
+  const blot = Quill.find(container)
+  if (!blot || !quill) return
+  const index = blot.offset(quill.scroll)
+  const length = blot.length()
+  const text = quill.getText(index, length)
+  const line = container.querySelector('.ql-code-block')
+  codeCopy.visible = false
+  codeEditor.index = index
+  codeEditor.length = length
+  // Il newline finale appartiene alla struttura del blocco Quill, non al
+  // testo digitato. Eventuali newline aggiuntivi restano invece intatti.
+  codeEditor.code = text.endsWith('\n') ? text.slice(0, -1) : text
+  codeEditor.language = line?.dataset.language || 'plain'
+  codeEditor.visible = true
+}
+
+function openCodeBlockFromActions() {
+  const container = codeCopy.container
+  if (container && quill?.root.contains(container)) openCodeBlockEditor(container)
+}
+
+function updateCodeCopyButton(event) {
+  if (codeEditor.visible || !quillEditorEl.value) {
+    codeCopy.visible = false
+    return
+  }
+  const container = event.target.closest('.ql-code-block-container')
+  if (!container) {
+    codeCopy.visible = false
+    return
+  }
+  if (codeCopy.container === container && codeCopy.visible) return
+  const blockRect = container.getBoundingClientRect()
+  const hostRect = quillEditorEl.value.getBoundingClientRect()
+  const languagePicker = container.querySelector('.ql-ui')?.getBoundingClientRect()
+  codeCopy.container = container
+  codeCopy.position = {
+    top: `${Math.round(blockRect.top - hostRect.top + 5)}px`,
+    left: `${Math.round((languagePicker?.left ?? blockRect.right) - hostRect.left - 60)}px`
+  }
+  codeCopy.visible = true
+}
+
+function hideCodeCopyButton(event) {
+  // Il bottone e' fratello dell'area Quill: passando dal blocco al bottone il
+  // browser emette `mouseleave` sulla root. Non va interpretato come uscita
+  // reale, altrimenti il controllo sparisce proprio mentre lo si raggiunge.
+  if (event?.relatedTarget?.closest?.('.code-block-actions')) return
+  codeCopy.visible = false
+}
+
+function onCodeCopyButtonLeave(event) {
+  // Anche il percorso inverso (bottone → blocco) deve restare stabile; il
+  // prossimo mousemove nella root aggiornerà eventualmente la posizione.
+  if (codeCopy.container?.contains(event.relatedTarget)) return
+  codeCopy.visible = false
+}
+
+async function copyCodeBlock() {
+  const container = codeCopy.container
+  const blot = container && quill?.root.contains(container) ? Quill.find(container) : null
+  codeCopy.visible = false
+  if (!blot || !quill) return
+  const index = blot.offset(quill.scroll)
+  const text = quill.getText(index, blot.length()).replace(/\n$/, '')
+  await navigator.clipboard.writeText(text)
+  toast.add({ severity: 'success', summary: t('quill.toast.codeCopied'), life: 1500 })
+}
+
+function onCodeAreaScroll() {
+  codeCopy.visible = false
+}
+
+function closeCodeBlockEditor() {
+  codeEditor.visible = false
+  nextTick(() => quill?.focus())
+}
+
+function saveCodeBlock({ code, language }) {
+  if (!quill) return
+  const normalized = String(code).replace(/\r\n?/g, '\n')
+  const lines = normalized.split('\n')
+  const update = new Delta().retain(codeEditor.index).delete(codeEditor.length)
+  lines.forEach((line) => {
+    if (line) update.insert(line)
+    update.insert('\n', { 'code-block': language || 'plain' })
+  })
+  const cursor = codeEditor.index + normalized.length
+  codeEditor.visible = false
+  quill.updateContents(update, 'user')
+  quill.setSelection(cursor, 0, 'silent')
+  nextTick(() => quill?.focus())
+}
+
 // Un click su un link lo apre nel browser di sistema. Non si puo' lasciare
 // navigare l'ancora: la webview seguirebbe l'URL sostituendo l'app stessa.
 // Per modificare o rimuovere un link restano il tasto destro (vedi
@@ -1498,6 +1644,9 @@ onMounted(async () => {
   applySpellcheck()
   quill.root.addEventListener('contextmenu', onEditorContextMenu)
   quill.root.addEventListener('click', onEditorClick)
+  quill.root.addEventListener('mousemove', updateCodeCopyButton)
+  quill.root.addEventListener('mouseleave', hideCodeCopyButton)
+  editorEl.value.addEventListener('scroll', onCodeAreaScroll)
   window.addEventListener('mousedown', onGlobalMousedown)
 
   quill.on('text-change', (_delta, _oldDelta, source) => {
@@ -1656,6 +1805,9 @@ defineExpose({
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousedown', onGlobalMousedown)
+  editorEl.value?.removeEventListener('scroll', onCodeAreaScroll)
+  quill?.root.removeEventListener('mousemove', updateCodeCopyButton)
+  quill?.root.removeEventListener('mouseleave', hideCodeCopyButton)
   const tipHost = props.toolbarContainer
   if (tipHost) {
     tipHost.removeEventListener('mouseover', onToolbarPointerOver)
@@ -2099,6 +2251,43 @@ onBeforeUnmount(() => {
   color: var(--p-text-color);
   border-radius: 8px;
   padding: 10px 14px;
+  cursor: text;
+  outline: 1px solid transparent;
+  transition: outline-color 0.12s ease, box-shadow 0.12s ease;
+}
+.quill-editor :deep(.ql-editor .ql-code-block-container:hover) {
+  outline-color: var(--p-content-border-color);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* Un solo gruppo di azioni Vue segue il blocco sotto il puntatore. Rimane fuori dal
+   DOM gestito da Quill, quindi non può finire nel Delta o nell'HTML salvato. */
+.code-block-actions {
+  position: absolute;
+  z-index: 14;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.code-block-actions button {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+}
+.code-block-actions button:hover {
+  background: var(--selection-bg);
+  color: var(--p-text-color);
+}
+.code-block-actions :deep(svg) {
+  font-size: 14px;
 }
 
 /* syntax highlighting dei blocchi di codice (modulo Syntax di Quill + highlight.js),

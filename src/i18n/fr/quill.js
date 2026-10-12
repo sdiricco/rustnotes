@@ -59,6 +59,12 @@ export default {
   codeLanguages: {
     plain: 'Texte brut'
   },
+  codeEditor: {
+    title: 'Éditeur de code',
+    language: 'Langage',
+    save: 'Enregistrer',
+    saveHint: '⌘ Entrée pour enregistrer · Échap pour annuler'
+  },
   linkPrompt: {
     textLabel: 'Texte à afficher',
     textPlaceholder: '(laisser vide pour utiliser l’adresse)',
@@ -88,6 +94,7 @@ export default {
   },
   toast: {
     cannotOpenLink: 'Impossible d’ouvrir le lien',
-    copiedAsMarkdown: 'Copié en Markdown'
+    copiedAsMarkdown: 'Copié en Markdown',
+    codeCopied: 'Code copié'
   }
 }

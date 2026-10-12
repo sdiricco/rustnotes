@@ -10,8 +10,9 @@ describe('gestione note', () => {
 
     await $('[data-testid="create-note"]').click()
 
-    const listTitle = $('.note-item.active .note-title')
-    await listTitle.click()
+    // Rinomina dalla lista: menu azioni della nota, prima voce ("Rinomina").
+    await $('.note-item.active .kebab').click()
+    await $('.p-menu .menu-row').click()
     const titleInput = $('[data-testid="note-title-input"]')
     await titleInput.setValue(firstTitle)
     await browser.keys('Enter')

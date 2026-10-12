@@ -30,12 +30,15 @@
         <template v-if="store.selectedNote">
           <Icon icon="lucide:chevron-right" class="crumb-sep" />
           <span class="crumb crumb-note" :title="noteTitle" data-tauri-drag-region="false">
-            <InputText
+            <!-- Input minimale: eredita il font del breadcrumb, niente bordo
+                 ne' sfondo, si vede solo il cursore. -->
+            <input
               v-if="editingTitle"
               ref="titleInput"
               v-model="titleDraft"
               class="title-input"
               data-testid="header-title-input"
+              spellcheck="false"
               @click.stop
               @keydown.enter.prevent="commitTitle"
               @keydown.esc.prevent="cancelTitle"
@@ -84,7 +87,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import InputText from 'primevue/inputtext'
 import { useI18n } from 'vue-i18n'
 import { useNotesStore } from '../stores/notes'
 import { useUiStore } from '../stores/ui'
@@ -110,7 +112,7 @@ function startTitleEdit() {
   if (!store.selectedNote) return
   titleDraft.value = store.selectedNote.title || ''
   editingTitle.value = true
-  nextTick(() => (titleInput.value?.$el || titleInput.value)?.focus?.())
+  nextTick(() => titleInput.value?.focus())
 }
 
 function commitTitle() {
@@ -244,14 +246,15 @@ watch(
   white-space: nowrap;
 }
 
+/* Il titolo occupa solo lo spazio del testo (tronca se serve), cosi' la
+   matita resta accanto al nome invece che in fondo alla barra. */
 .title-label {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   border: 0;
-  padding: 3px 2px;
+  padding: 0;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -264,26 +267,32 @@ watch(
   display: flex;
   align-items: center;
   border: 0;
-  border-radius: 5px;
-  padding: 4px;
+  border-radius: 4px;
+  padding: 2px;
   background: transparent;
-  color: var(--icon-color);
+  color: var(--p-text-muted-color);
+  opacity: 0.55;
   cursor: pointer;
 }
 .title-edit:hover {
-  background: var(--sidebar-hover-bg);
+  opacity: 1;
   color: var(--p-text-color);
 }
 .title-edit :deep(svg) {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .title-input {
-  width: min(360px, 42vw);
-  min-width: 180px;
-  height: 30px;
-  padding: 5px 9px;
-  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--p-text-color);
+  font: inherit;
+  outline: none;
+  caret-color: var(--p-primary-color);
 }
 
 /* Pannello cartelle: largo quanto serve alle voci, non 360px come quello

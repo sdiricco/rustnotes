@@ -59,6 +59,12 @@ export default {
   codeLanguages: {
     plain: '纯文本'
   },
+  codeEditor: {
+    title: '代码编辑器',
+    language: '语言',
+    save: '保存',
+    saveHint: '⌘ 回车保存 · Esc 取消'
+  },
   linkPrompt: {
     textLabel: '显示的文字',
     textPlaceholder: '（留空则使用地址）',
@@ -88,6 +94,7 @@ export default {
   },
   toast: {
     cannotOpenLink: '无法打开链接',
-    copiedAsMarkdown: '已拷贝为 Markdown'
+    copiedAsMarkdown: '已拷贝为 Markdown',
+    codeCopied: '代码已复制'
   }
 }

@@ -147,37 +147,23 @@
             @update:model-value="toggleNoteSelected(note.id)"
           />
           <Icon v-if="note.pinned" icon="lucide:star" class="pin-icon" />
-          <InputText
+          <!-- Input minimale: stesso font del titolo, niente bordo ne' sfondo,
+               si vede solo il cursore. -->
+          <input
             v-if="renamingId === note.id"
             ref="renameInput"
             v-model="renameValue"
             class="rename-input"
             data-testid="note-title-input"
+            spellcheck="false"
             @click.stop
             @keydown.enter.prevent="commitRename(note)"
             @keydown.esc.prevent="cancelRename"
             @blur="commitRename(note)"
           />
-          <button
-            v-else
-            type="button"
-            class="note-title"
-            :data-note-title="note.title"
-            :title="t('list.menu.rename')"
-            @click.stop="startRename(note)"
-          >
+          <span v-else class="note-title" :data-note-title="note.title">
             {{ note.title || t('common.untitledNote') }}
-          </button>
-          <button
-            v-if="!selectionMode && renamingId !== note.id"
-            type="button"
-            class="rename-btn"
-            :title="t('list.menu.rename')"
-            :aria-label="t('list.menu.rename')"
-            @click.stop="startRename(note)"
-          >
-            <Icon icon="lucide:pencil" />
-          </button>
+          </span>
           <button
             v-if="!selectionMode"
             class="kebab"
@@ -248,7 +234,6 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import Menu from 'primevue/menu'
 import Checkbox from 'primevue/checkbox'
-import InputText from 'primevue/inputtext'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { Icon } from '@iconify/vue'
@@ -775,32 +760,6 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: 0;
-  padding: 2px 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  font-family: inherit;
-  cursor: text;
-}
-
-.rename-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  border: 0;
-  border-radius: 5px;
-  padding: 3px;
-  background: transparent;
-  color: var(--icon-color);
-  cursor: pointer;
-}
-.rename-btn:hover {
-  background: var(--selection-bg);
-  color: var(--p-text-color);
-}
-.rename-btn :deep(svg) {
-  font-size: 12px;
 }
 
 .kebab {
@@ -835,9 +794,16 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
 .rename-input {
   flex: 1;
   min-width: 0;
-  height: 32px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
   font-size: 13px;
-  padding: 5px 9px;
+  outline: none;
+  caret-color: var(--p-primary-color);
 }
 
 .note-meta {

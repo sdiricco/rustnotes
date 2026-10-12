@@ -59,6 +59,12 @@ export default {
   codeLanguages: {
     plain: '標準テキスト'
   },
+  codeEditor: {
+    title: 'コードエディター',
+    language: '言語',
+    save: '保存',
+    saveHint: '⌘ Enter で保存 · Esc でキャンセル'
+  },
   linkPrompt: {
     textLabel: '表示するテキスト',
     textPlaceholder: '（空欄の場合はアドレスを使用）',
@@ -88,6 +94,7 @@ export default {
   },
   toast: {
     cannotOpenLink: 'リンクを開けません',
-    copiedAsMarkdown: 'Markdownとしてコピーしました'
+    copiedAsMarkdown: 'Markdownとしてコピーしました',
+    codeCopied: 'コードをコピーしました'
   }
 }
