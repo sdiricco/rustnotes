@@ -184,29 +184,6 @@
       @cancel="closeCodeBlockEditor"
     />
 
-    <div
-      v-if="codeCopy.visible && !codeEditor.visible"
-      class="code-block-actions"
-      :style="codeCopy.position"
-      @mouseleave="onCodeCopyButtonLeave"
-    >
-      <button
-        type="button"
-        :title="t('quill.contextMenu.copy')"
-        @mousedown.prevent.stop
-        @click.stop="copyCodeBlock"
-      >
-        <Icon icon="lucide:copy" />
-      </button>
-      <button
-        type="button"
-        :title="t('quill.codeEditor.title')"
-        @mousedown.prevent.stop
-        @click.stop="openCodeBlockFromActions"
-      >
-        <Icon icon="lucide:maximize-2" />
-      </button>
-    </div>
   </div>
 
   <!-- Il bottone che apre questo overlay vive fuori dal template di questo
@@ -320,8 +297,6 @@ const codeEditor = reactive({
   code: '',
   language: 'plain'
 })
-const codeCopy = reactive({ visible: false, container: null, position: {} })
-
 // Formati dedicati alla ricerca (Cmd+F): applicati/rimossi con source
 // 'silent' così non finiscono nel contenuto salvato né nella cronologia
 // undo (il testo-change handler e la history di Quill ignorano 'silent').
@@ -1047,7 +1022,6 @@ function openCodeBlockEditor(container) {
   const length = blot.length()
   const text = quill.getText(index, length)
   const line = container.querySelector('.ql-code-block')
-  codeCopy.visible = false
   codeEditor.index = index
   codeEditor.length = length
   // Il newline finale appartiene alla struttura del blocco Quill, non al
@@ -1057,52 +1031,8 @@ function openCodeBlockEditor(container) {
   codeEditor.visible = true
 }
 
-function openCodeBlockFromActions() {
-  const container = codeCopy.container
-  if (container && quill?.root.contains(container)) openCodeBlockEditor(container)
-}
-
-function updateCodeCopyButton(event) {
-  if (codeEditor.visible || !quillEditorEl.value) {
-    codeCopy.visible = false
-    return
-  }
-  const container = event.target.closest('.ql-code-block-container')
-  if (!container) {
-    codeCopy.visible = false
-    return
-  }
-  if (codeCopy.container === container && codeCopy.visible) return
-  const blockRect = container.getBoundingClientRect()
-  const hostRect = quillEditorEl.value.getBoundingClientRect()
-  const languagePicker = container.querySelector('.ql-ui')?.getBoundingClientRect()
-  codeCopy.container = container
-  codeCopy.position = {
-    top: `${Math.round(blockRect.top - hostRect.top + 5)}px`,
-    left: `${Math.round((languagePicker?.left ?? blockRect.right) - hostRect.left - 60)}px`
-  }
-  codeCopy.visible = true
-}
-
-function hideCodeCopyButton(event) {
-  // Il bottone e' fratello dell'area Quill: passando dal blocco al bottone il
-  // browser emette `mouseleave` sulla root. Non va interpretato come uscita
-  // reale, altrimenti il controllo sparisce proprio mentre lo si raggiunge.
-  if (event?.relatedTarget?.closest?.('.code-block-actions')) return
-  codeCopy.visible = false
-}
-
-function onCodeCopyButtonLeave(event) {
-  // Anche il percorso inverso (bottone → blocco) deve restare stabile; il
-  // prossimo mousemove nella root aggiornerà eventualmente la posizione.
-  if (codeCopy.container?.contains(event.relatedTarget)) return
-  codeCopy.visible = false
-}
-
-async function copyCodeBlock() {
-  const container = codeCopy.container
+async function copyCodeBlock(container) {
   const blot = container && quill?.root.contains(container) ? Quill.find(container) : null
-  codeCopy.visible = false
   if (!blot || !quill) return
   const index = blot.offset(quill.scroll)
   const text = quill.getText(index, blot.length()).replace(/\n$/, '')
@@ -1110,8 +1040,90 @@ async function copyCodeBlock() {
   toast.add({ severity: 'success', summary: t('quill.toast.codeCopied'), life: 1500 })
 }
 
-function onCodeAreaScroll() {
-  codeCopy.visible = false
+const CODE_COPY_ICON = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+  </svg>
+`
+const CODE_EXPAND_ICON = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+  </svg>
+`
+
+function setCodeHeaderButtonLabel(button, label) {
+  button.title = label
+  button.setAttribute('aria-label', label)
+}
+
+function createCodeHeaderButton(className, icon, onClick) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = className
+  button.innerHTML = icon
+  button.setAttribute('contenteditable', 'false')
+  button.addEventListener('mousedown', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+  })
+  button.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    onClick()
+  })
+  return button
+}
+
+// Il modulo Syntax di Quill monta un <select> come uiNode del blocco. Lo
+// promuoviamo a un header completo senza inserirlo nel Delta: il wrapper
+// diventa il nuovo uiNode, mentre la proprietà value continua a delegare al
+// select come si aspetta internamente Quill durante optimize().
+function decorateCodeBlockHeaders() {
+  if (!quill) return
+  quill.root.querySelectorAll('.ql-code-block-container').forEach((container) => {
+    if (container.querySelector(':scope > .code-block-header')) return
+    const select = container.querySelector(':scope > select.ql-ui')
+    const blot = Quill.find(container)
+    if (!select || !blot) return
+
+    const header = document.createElement('div')
+    header.className = 'ql-ui code-block-header'
+    header.setAttribute('contenteditable', 'false')
+    Object.defineProperty(header, 'value', {
+      configurable: true,
+      get: () => select.value,
+      set: (value) => { select.value = value }
+    })
+
+    select.classList.remove('ql-ui')
+    select.classList.add('code-block-language')
+    select.setAttribute('aria-label', t('quill.codeEditor.language'))
+
+    const spacer = document.createElement('span')
+    spacer.className = 'code-block-header-spacer'
+    const copyButton = createCodeHeaderButton('code-block-copy', CODE_COPY_ICON, () => copyCodeBlock(container))
+    const expandButton = createCodeHeaderButton('code-block-expand', CODE_EXPAND_ICON, () => openCodeBlockEditor(container))
+    setCodeHeaderButtonLabel(copyButton, t('quill.contextMenu.copy'))
+    setCodeHeaderButtonLabel(expandButton, t('quill.codeEditor.title'))
+
+    select.replaceWith(header)
+    header.append(select, spacer, copyButton, expandButton)
+    blot.uiNode = header
+  })
+}
+
+function refreshCodeBlockHeaderLabels() {
+  if (!quill) return
+  quill.root.querySelectorAll('.code-block-language').forEach((select) => {
+    select.setAttribute('aria-label', t('quill.codeEditor.language'))
+  })
+  quill.root.querySelectorAll('.code-block-copy').forEach((button) => {
+    setCodeHeaderButtonLabel(button, t('quill.contextMenu.copy'))
+  })
+  quill.root.querySelectorAll('.code-block-expand').forEach((button) => {
+    setCodeHeaderButtonLabel(button, t('quill.codeEditor.title'))
+  })
 }
 
 function closeCodeBlockEditor() {
@@ -1293,6 +1305,20 @@ const editorBindings = {
   checkList: { key: 57, shortKey: true, shiftKey: true, handler(r, c) { const on = c.format.list === 'checked' || c.format.list === 'unchecked'; this.quill.format('list', on ? false : 'unchecked', 'user'); return false } },
   blockquote: { key: 66, shortKey: true, shiftKey: true, handler(r, c) { this.quill.format('blockquote', !c.format.blockquote, 'user'); return false } },
   codeBlock: { key: 67, shortKey: true, shiftKey: true, handler(r, c) { this.quill.format('code-block', !c.format['code-block'], 'user'); return false } },
+  // Quill richiede due righe vuote consecutive (tre Invio dalla fine del
+  // codice) per uscire dal blocco. Una sola riga vuota è sufficiente: il
+  // primo Invio continua il codice, il secondo la converte in paragrafo.
+  exitCodeBlock: {
+    key: 'Enter',
+    collapsed: true,
+    empty: true,
+    format: ['code-block'],
+    handler(range) {
+      this.quill.formatLine(range.index, 1, 'code-block', false, 'user')
+      this.quill.setSelection(range.index, 0, 'silent')
+      return false
+    }
+  },
   link: { key: 75, shortKey: true, handler(r) { openLinkPromptForRange(r); return false } },
   // ⌥⇧⌘V, "Incolla e adatta stile" standard di macOS: stessa logica della voce
   // omonima del menu contestuale.
@@ -1641,15 +1667,14 @@ onMounted(async () => {
   applyToolbarTooltips(quill.getModule('toolbar').container)
 
   loadContent(props.content)
+  decorateCodeBlockHeaders()
   applySpellcheck()
   quill.root.addEventListener('contextmenu', onEditorContextMenu)
   quill.root.addEventListener('click', onEditorClick)
-  quill.root.addEventListener('mousemove', updateCodeCopyButton)
-  quill.root.addEventListener('mouseleave', hideCodeCopyButton)
-  editorEl.value.addEventListener('scroll', onCodeAreaScroll)
   window.addEventListener('mousedown', onGlobalMousedown)
 
   quill.on('text-change', (_delta, _oldDelta, source) => {
+    decorateCodeBlockHeaders()
     // solo modifiche dell'utente: il load e la normalizzazione interna non vanno salvati
     if (internalUpdate || source !== 'user') return
     // getSemanticHTML() serializza dal modello Delta, escludendo gli elementi UI
@@ -1688,9 +1713,10 @@ watch(locale, () => {
   applyToolbarTooltips(quill.getModule('toolbar').container)
   const plain = CODE_LANGUAGES.find((l) => l.key === 'plain')
   if (plain) plain.label = t('quill.codeLanguages.plain')
-  quill.root.querySelectorAll('.ql-code-block-container select.ql-ui option[value="plain"]').forEach((opt) => {
+  quill.root.querySelectorAll('.ql-code-block-container .code-block-language option[value="plain"]').forEach((opt) => {
     opt.textContent = plain?.label ?? opt.textContent
   })
+  refreshCodeBlockHeaderLabels()
 })
 
 watch(
@@ -1698,6 +1724,7 @@ watch(
   () => {
     if (!quill) return
     loadContent(props.content)
+    decorateCodeBlockHeaders()
   }
 )
 
@@ -1805,9 +1832,6 @@ defineExpose({
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousedown', onGlobalMousedown)
-  editorEl.value?.removeEventListener('scroll', onCodeAreaScroll)
-  quill?.root.removeEventListener('mousemove', updateCodeCopyButton)
-  quill?.root.removeEventListener('mouseleave', hideCodeCopyButton)
   const tipHost = props.toolbarContainer
   if (tipHost) {
     tipHost.removeEventListener('mouseover', onToolbarPointerOver)
@@ -2260,17 +2284,28 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
-/* Un solo gruppo di azioni Vue segue il blocco sotto il puntatore. Rimane fuori dal
-   DOM gestito da Quill, quindi non può finire nel Delta o nell'HTML salvato. */
-.code-block-actions {
-  position: absolute;
-  z-index: 14;
-  height: 26px;
+/* Header UI del blocco: Quill lo esclude dal Delta e dall'HTML semantico. È
+   sticky rispetto allo scroll della nota e resta vincolato al proprio blocco,
+   quindi lingua, copia ed espandi rimangono disponibili anche nei blocchi
+   molto lunghi senza sovrapporsi a quelli successivi. */
+.quill-editor :deep(.ql-code-block-container .code-block-header.ql-ui) {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-height: 34px;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
+  margin: -10px -14px 8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--p-content-border-color);
+  border-radius: 8px 8px 0 0;
+  background: var(--search-bg);
 }
-.code-block-actions button {
+.quill-editor :deep(.code-block-header-spacer) {
+  flex: 1;
+}
+.quill-editor :deep(.code-block-header button) {
   width: 26px;
   height: 26px;
   display: flex;
@@ -2281,13 +2316,24 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--p-text-muted-color);
   cursor: pointer;
+  flex: 0 0 auto;
 }
-.code-block-actions button:hover {
+.quill-editor :deep(.code-block-header button:hover) {
   background: var(--selection-bg);
   color: var(--p-text-color);
 }
-.code-block-actions :deep(svg) {
-  font-size: 14px;
+.quill-editor :deep(.code-block-header button:focus-visible) {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: -2px;
+}
+.quill-editor :deep(.code-block-header button svg) {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* syntax highlighting dei blocchi di codice (modulo Syntax di Quill + highlight.js),
@@ -2336,13 +2382,9 @@ onBeforeUnmount(() => {
 .quill-editor :deep(.ql-code-block-container .hljs-operator) {
   color: var(--cm-punct);
 }
-/* Selettore lingua che il modulo Syntax aggiunge a ogni blocco: è un <select>
-   nativo, qui spogliato del chrome di sistema (appearance:none + freccia SVG
-   propria) per farlo somigliare a un chip dell'app invece che a un controllo
-   del sistema operativo. */
-.quill-editor :deep(.ql-code-block-container .ql-ui) {
-  top: 6px;
-  right: 6px;
+/* Selettore lingua originariamente creato dal modulo Syntax e ora ospitato
+   nell'header sticky. */
+.quill-editor :deep(.ql-code-block-container .code-block-language) {
   appearance: none;
   -webkit-appearance: none;
   border: none;
@@ -2358,13 +2400,14 @@ onBeforeUnmount(() => {
   padding: 3px 20px 3px 6px;
   cursor: pointer;
 }
-.quill-editor :deep(.ql-code-block-container .ql-ui:hover) {
+.quill-editor :deep(.ql-code-block-container .code-block-language:hover) {
   color: var(--p-text-color);
 }
-.quill-editor :deep(.ql-code-block-container .ql-ui:focus) {
-  outline: none;
+.quill-editor :deep(.ql-code-block-container .code-block-language:focus-visible) {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: -2px;
 }
-.quill-editor :deep(.ql-code-block-container .ql-ui option) {
+.quill-editor :deep(.ql-code-block-container .code-block-language option) {
   background: var(--card-bg);
   color: var(--p-text-color);
 }
