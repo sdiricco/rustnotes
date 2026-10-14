@@ -2226,7 +2226,9 @@ onBeforeUnmount(() => {
 }
 
 .quill-editor :deep(.ql-editor) {
-  padding: 22px 24px 40px;
+  /* Più respiro sotto l'ultimo elemento: quando si arriva in fondo alla nota,
+     testo e blocchi non devono appoggiarsi al bordo dell'area di scorrimento. */
+  padding: 22px 24px 72px;
   line-height: 1.6;
 }
 
