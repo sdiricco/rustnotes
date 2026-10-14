@@ -33,7 +33,7 @@ describe('gestione note', () => {
     await expect($(`.note-title[data-note-title="${title}"]`)).not.toExist()
   })
 
-  it('mantiene visibile l’header dei blocchi di codice durante lo scroll', async () => {
+  it('mostra un header non sticky e permette di uscire da righe con molti spazi', async () => {
     await browser.tauri.switchWindow('main')
     await $('[data-testid="create-note"]').click()
 
@@ -46,25 +46,28 @@ describe('gestione note', () => {
 
     const header = $('.ql-code-block-container .code-block-header')
     await expect(header).toExist()
-    expect((await header.getCSSProperty('position')).value).toBe('sticky')
+    expect((await header.getCSSProperty('position')).value).toBe('static')
     await expect($('.code-block-header .code-block-language')).toBeDisplayed()
     await expect($('.code-block-header .code-block-copy')).toBeDisplayed()
     await expect($('.code-block-header .code-block-expand')).toBeDisplayed()
 
-    const positions = await browser.execute(() => {
-      const root = document.querySelector('.ql-editor')
+    const headerLayout = await browser.execute(() => {
       const block = document.querySelector('.ql-code-block-container')
-      const stickyHeader = document.querySelector('.code-block-header')
-      root.scrollTop = Math.min(400, root.scrollHeight - root.clientHeight)
+      const stickyHeader = block.querySelector('.code-block-header')
+      const background = getComputedStyle(stickyHeader).backgroundColor
+      const components = background.match(/[\d.]+/g)?.map(Number) ?? []
       return {
-        rootTop: root.getBoundingClientRect().top,
-        blockBottom: block.getBoundingClientRect().bottom,
-        headerTop: stickyHeader.getBoundingClientRect().top,
-        headerBottom: stickyHeader.getBoundingClientRect().bottom
+        isFirstElement: block.firstElementChild === stickyHeader,
+        backgroundAlpha: components.length === 4 ? components[3] : 1,
+        blockHeight: block.getBoundingClientRect().height,
+        viewportHeight: window.innerHeight,
+        overflowY: getComputedStyle(block).overflowY
       }
     })
-    expect(positions.headerTop).toBeGreaterThanOrEqual(positions.rootTop)
-    expect(positions.headerBottom).toBeLessThanOrEqual(positions.blockBottom)
+    expect(headerLayout.isFirstElement).toBe(true)
+    expect(headerLayout.backgroundAlpha).toBe(1)
+    expect(headerLayout.overflowY).toBe('visible')
+    expect(headerLayout.blockHeight).toBeGreaterThan(headerLayout.viewportHeight * 0.3)
 
     await browser.execute(() => {
       const lines = [...document.querySelectorAll('.ql-code-block-container .ql-code-block')]
@@ -86,6 +89,7 @@ describe('gestione note', () => {
       return (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)
         .closest('.ql-code-block-container') !== null
     })).toBe(true)
+    await browser.keys(' '.repeat(1000))
     await browser.keys('Enter')
     expect(await browser.execute(() => {
       const node = window.getSelection().anchorNode

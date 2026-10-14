@@ -1109,6 +1109,9 @@ function decorateCodeBlockHeaders() {
 
     select.replaceWith(header)
     header.append(select, spacer, copyButton, expandButton)
+    // attachUI() di Quill inserisce il select dopo le righe di codice. L'header
+    // deve invece essere il primo elemento del blocco, prima del contenuto.
+    container.prepend(header)
     blot.uiNode = header
   })
 }
@@ -1306,16 +1309,21 @@ const editorBindings = {
   blockquote: { key: 66, shortKey: true, shiftKey: true, handler(r, c) { this.quill.format('blockquote', !c.format.blockquote, 'user'); return false } },
   codeBlock: { key: 67, shortKey: true, shiftKey: true, handler(r, c) { this.quill.format('code-block', !c.format['code-block'], 'user'); return false } },
   // Quill richiede due righe vuote consecutive (tre Invio dalla fine del
-  // codice) per uscire dal blocco. Una sola riga vuota è sufficiente: il
-  // primo Invio continua il codice, il secondo la converte in paragrafo.
+  // codice) per uscire dal blocco. Una sola riga vuota, anche se contiene
+  // qualunque quantità di spazi o tab, è sufficiente: Invio la converte in
+  // un paragrafo vuoto fuori dal blocco.
   exitCodeBlock: {
     key: 'Enter',
     collapsed: true,
-    empty: true,
     format: ['code-block'],
-    handler(range) {
-      this.quill.formatLine(range.index, 1, 'code-block', false, 'user')
-      this.quill.setSelection(range.index, 0, 'silent')
+    prefix: /^\s*$/,
+    suffix: /^\s*$/,
+    handler(range, context) {
+      const lineStart = range.index - context.prefix.length
+      const whitespaceLength = context.prefix.length + context.suffix.length
+      if (whitespaceLength) this.quill.deleteText(lineStart, whitespaceLength, 'user')
+      this.quill.formatLine(lineStart, 1, 'code-block', false, 'user')
+      this.quill.setSelection(lineStart, 0, 'silent')
       return false
     }
   },
@@ -2271,7 +2279,7 @@ onBeforeUnmount(() => {
 }
 
 .quill-editor :deep(.ql-editor .ql-code-block-container) {
-  background: var(--search-bg);
+  background: var(--code-block-bg);
   color: var(--p-text-color);
   border-radius: 8px;
   padding: 10px 14px;
@@ -2284,14 +2292,10 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
-/* Header UI del blocco: Quill lo esclude dal Delta e dall'HTML semantico. È
-   sticky rispetto allo scroll della nota e resta vincolato al proprio blocco,
-   quindi lingua, copia ed espandi rimangono disponibili anche nei blocchi
-   molto lunghi senza sovrapporsi a quelli successivi. */
+/* Header UI del blocco: Quill lo esclude dal Delta e dall'HTML semantico.
+   Rimane nel normale flusso, come primo elemento del blocco. */
 .quill-editor :deep(.ql-code-block-container .code-block-header.ql-ui) {
-  position: sticky;
-  top: 0;
-  z-index: 3;
+  position: static;
   min-height: 34px;
   display: flex;
   align-items: center;
@@ -2300,7 +2304,7 @@ onBeforeUnmount(() => {
   padding: 4px 6px;
   border-bottom: 1px solid var(--p-content-border-color);
   border-radius: 8px 8px 0 0;
-  background: var(--search-bg);
+  background: var(--code-block-bg);
 }
 .quill-editor :deep(.code-block-header-spacer) {
   flex: 1;
