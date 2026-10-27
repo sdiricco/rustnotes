@@ -2,30 +2,30 @@
   <!-- La destinazione e' il pannello NoteEditor, non body: CodeMirror copre
        anche la toolbar di formattazione ma lascia visibili sidebar e header
        globale dell'app. -->
-  <Teleport to=".note-editor">
-  <section class="code-editor-page" role="region" :aria-label="t('quill.codeEditor.title')">
-    <header class="code-editor-header">
-      <div class="code-editor-title">
-        <Icon icon="lucide:file-code-2" />
-        <span>{{ t('quill.codeEditor.title') }}</span>
-      </div>
-      <label class="code-editor-language">
-        <span>{{ t('quill.codeEditor.language') }}</span>
-        <select v-model="language" @change="setLanguage">
-          <option v-for="item in languages" :key="item.key" :value="item.key">
-            {{ item.label }}
-          </option>
-        </select>
-      </label>
-      <button
-        type="button"
-        class="code-editor-close"
-        :title="t('quill.findBar.close')"
-        @click="emit('cancel')"
-      >
-        <Icon icon="lucide:x" />
-      </button>
-    </header>
+  <Teleport :to="teleportTo">
+    <section class="code-editor-page" role="region" :aria-label="t('quill.codeEditor.title')">
+      <header class="code-editor-header">
+        <div class="code-editor-title">
+          <Icon icon="lucide:file-code-2" />
+          <span>{{ t('quill.codeEditor.title') }}</span>
+        </div>
+        <label class="code-editor-language">
+          <span>{{ t('quill.codeEditor.language') }}</span>
+          <select v-model="language" @change="setLanguage">
+            <option v-for="item in languages" :key="item.key" :value="item.key">
+              {{ item.label }}
+            </option>
+          </select>
+        </label>
+        <button
+          type="button"
+          class="code-editor-close"
+          :title="t('quill.findBar.close')"
+          @click="emit('cancel')"
+        >
+          <Icon icon="lucide:x" />
+        </button>
+      </header>
 
     <div ref="editorEl" class="code-editor-host"></div>
 
@@ -71,6 +71,7 @@ import { ruby } from '@codemirror/legacy-modes/mode/ruby'
 import { codeCompletionsFor, codeMemberCompletionsFor } from '../utils/codeCompletions'
 
 const props = defineProps({
+  teleportTo: { type: Object, required: true },
   code: { type: String, default: '' },
   initialLanguage: { type: String, default: 'plain' },
   languages: { type: Array, default: () => [] }

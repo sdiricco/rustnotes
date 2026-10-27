@@ -68,13 +68,9 @@
       </nav>
     </div>
 
-    <!-- Bersaglio del Teleport delle azioni sulla nota (cerca nella nota,
-         preferito, cestino, "⋮"): il markup e la logica restano in
-         NoteEditor — dialogo Markdown, riferimento all'editor, ortografia —
-         e qui ne cambia solo la posizione nel DOM. Cablare quelle azioni
-         attraverso due componenti avrebbe richiesto una catena di ref ed
-         eventi per la stessa resa. -->
-    <div id="header-note-actions" class="header-note-actions" data-tauri-drag-region="false"></div>
+    <div class="header-note-actions" data-tauri-drag-region="false">
+      <slot name="note-actions" />
+    </div>
 
     <div class="header-settings" data-tauri-drag-region="false">
       <button class="icon-btn" :title="t('header.settings')" @click="ui.openSettings()">
@@ -133,6 +129,7 @@ watch(
 
 <style scoped>
 .app-header {
+  min-width: 0;
   flex-shrink: 0;
   height: var(--titlebar-h, 38px); /* = barra del titolo nativa, vedi titlebar.rs */
   display: flex;
@@ -293,170 +290,5 @@ watch(
   font: inherit;
   outline: none;
   caret-color: var(--p-primary-color);
-}
-
-/* Pannello cartelle: largo quanto serve alle voci, non 360px come quello
-   delle note. Va dopo .crumb-panel: stessa specificita', vince l'ultima. */
-.folders-panel {
-  width: max-content;
-  min-width: 220px;
-}
-
-/* Campo di rinomina in testa al pannello delle note. */
-.panel-field {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 10px;
-  margin: -4px -4px 2px;
-  background: var(--editor-toolbar-bg);
-  border-bottom: 1px solid var(--p-content-border-color);
-}
-.field-icon {
-  font-size: 14px;
-  color: var(--p-text-muted-color);
-  flex-shrink: 0;
-}
-.panel-field input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--p-text-color);
-  font-size: 13px;
-  outline: none;
-}
-
-.menu-row.active {
-  background: var(--selection-bg);
-}
-.menu-row .grow {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.row-count {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--p-text-muted-color);
-}
-
-.crumb-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 360px;
-  max-height: 62vh;
-  overflow-y: auto;
-  padding: 4px;
-  background: var(--editor-toolbar-bg);
-  border: 1px solid var(--p-content-border-color);
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  z-index: 100;
-}
-
-.panel-label {
-  padding: 6px 10px 4px;
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--p-text-muted-color);
-}
-.panel-empty {
-  margin: 0;
-  padding: 8px 10px 12px;
-  font-size: 12px;
-  color: var(--p-text-muted-color);
-}
-
-/* Voce nota: stessi valori di .note-item nella lista, cosi' le due liste di
-   note si somigliano invece di essere due stili per la stessa cosa. */
-.crumb-note-item {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-  margin-bottom: 2px;
-}
-.crumb-note-item:hover {
-  background: var(--sidebar-hover-bg);
-}
-.crumb-note-item.active {
-  background: var(--card-bg);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
-}
-
-.crumb-note-top {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-.crumb-note-title {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--p-text-color);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.crumb-note-top .pin-icon {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--icon-color);
-}
-
-.crumb-note-meta {
-  display: flex;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--p-text-muted-color);
-  margin-top: 2px;
-  min-width: 0;
-}
-.crumb-note-date {
-  flex-shrink: 0;
-}
-.crumb-note-preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Voce dei menu a comparsa dell'header (creazione): stesse metriche delle
-   righe dei menu PrimeVue usate altrove nell'app. */
-.menu-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 10px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--p-text-color);
-  font-family: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  text-align: left;
-}
-.menu-row:hover {
-  background: var(--sidebar-hover-bg);
-}
-.menu-row :deep(svg) {
-  font-size: 15px;
-  color: var(--icon-color);
-  flex-shrink: 0;
 }
 </style>

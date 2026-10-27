@@ -388,7 +388,7 @@ function removeFolder(folder) {
      frecce risultavano disallineate in verticale. Lo spazio di respiro sopra
      le cartelle lo da' ora la banda stessa, alta 40px. */
   padding: 0 8px 12px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .sidebar-footer {
@@ -470,6 +470,7 @@ body.is-reordering {
 }
 
 .sidebar-section {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -477,6 +478,7 @@ body.is-reordering {
 }
 
 .sidebar-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -486,6 +488,12 @@ body.is-reordering {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--p-text-muted-color);
+}
+
+.sidebar-section.folders {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .icon-btn {
@@ -505,6 +513,7 @@ body.is-reordering {
 }
 
 .sidebar-item {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;

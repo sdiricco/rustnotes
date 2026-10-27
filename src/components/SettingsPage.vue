@@ -987,6 +987,7 @@ async function onExportAll() {
 .settings-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   padding: 20px 28px 40px;
 }

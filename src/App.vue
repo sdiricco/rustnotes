@@ -11,17 +11,13 @@
       <!-- Larghezza in pixel e non in percentuale: in percentuale il minimo
            del pannello valeva ~98px a finestra stretta e ~260px a schermo
            intero, cioe' non era un vincolo utile. -->
-        <!-- I semafori della finestra sono disegnati in alto a sinistra, che e'
+      <!-- I semafori della finestra sono disegnati in alto a sinistra, che e'
            sopra il pannello laterale e non sopra l'header: questa striscia
            lascia loro lo spazio ed e' l'area con cui si sposta la finestra da
            questo lato. Larga solo la zona dei semafori, non tutto il
            pannello: la banda contiene i pulsanti della vista, e coprirli li
            renderebbe inerti. -->
-      <div
-        v-if="sidebarInLayout"
-        class="browse-drag"
-        data-tauri-drag-region="deep"
-      ></div>
+      <div v-if="sidebarInLayout" class="browse-drag" data-tauri-drag-region="deep"></div>
 
       <!-- UN SOLO pannello laterale con due viste alternative: note (di
            default) e cartelle, come in un master-detail. Prima erano due
@@ -59,18 +55,14 @@
         @click="ui.toggleSidebar()"
       ></div>
 
-        <!-- Colonna di destra: l'header sta qui, non sopra tutto, così le
+      <!-- Colonna di destra: l'header sta qui, non sopra tutto, così le
              cartelle arrivano fino in cima alla finestra. -->
-        <div class="main-col">
-          <AppHeader
-            :sidebar-visible="ui.sidebarVisible"
-            :browse-in-layout="sidebarInLayout"
-            @toggle-sidebar="ui.toggleSidebar()"
-          />
-          <div class="pane editor-pane">
-            <NoteEditor />
-          </div>
-        </div>
+      <NoteEditor
+        class="main-col"
+        :sidebar-visible="ui.sidebarVisible"
+        :browse-in-layout="sidebarInLayout"
+        @toggle-sidebar="ui.toggleSidebar()"
+      />
     </div>
 
     <SettingsPage />
@@ -85,7 +77,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { Icon } from '@iconify/vue'
-import AppHeader from './components/AppHeader.vue'
 import Sidebar from './components/Sidebar.vue'
 import NoteList from './components/NoteList.vue'
 import NoteEditor from './components/NoteEditor.vue'
@@ -209,7 +200,11 @@ function onKeydown(event) {
   // handler, cosi' ⌘+ e ⌘= funzionano su ogni layout (menu.rs). Meno e zero
   // sono gia' del menu su tutti i layout: qui non si toccano, altrimenti
   // scatterebbero due volte.
-  if ((event.metaKey || event.ctrlKey) && !event.altKey && (event.key === '+' || event.key === '=')) {
+  if (
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    (event.key === '+' || event.key === '=')
+  ) {
     event.preventDefault()
     api.zoomIn()
     return
@@ -313,9 +308,7 @@ onBeforeUnmount(() => {
 .main-col {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  min-height: 0;
 }
 
 /* Striscia sopra cartelle+lista: solo lo spazio dei semafori, niente
@@ -337,17 +330,9 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* L'editor è l'unico elastico: assorbe tutto lo spazio residuo, così
-   trascinando un divisorio cambia solo il pannello alla sua sinistra. */
-.editor-pane {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
 .sidebar-panel {
   background: var(--sidebar-bg);
 }
-
 
 /* Sovrapposto (finestra stretta): fuori dal flusso, quindi l'editor si
    prende tutta la larghezza come se il pannello non esistesse. Da cima a

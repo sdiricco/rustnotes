@@ -1,5 +1,5 @@
 <template>
-  <div ref="quillEditorEl" class="quill-editor">
+  <div ref="quillEditorEl" class="quill-editor" v-bind="$attrs">
     <div v-show="!codeEditor.visible" ref="editorEl"></div>
 
     <!-- Cerca nella nota (Cmd+F): evidenzia i risultati con un formato Quill
@@ -177,13 +177,13 @@
 
     <CodeBlockEditor
       v-if="codeEditor.visible"
+      :teleport-to="overlayContainer || quillEditorEl"
       :code="codeEditor.code"
       :initial-language="codeEditor.language"
       :languages="CODE_LANGUAGES"
       @save="saveCodeBlock"
       @cancel="closeCodeBlockEditor"
     />
-
   </div>
 
   <!-- Il bottone che apre questo overlay vive fuori dal template di questo
@@ -270,6 +270,24 @@ const { t, locale } = useI18n()
 // il chunk viene scaricato soltanto alla prima apertura dell'editor esteso.
 const CodeBlockEditor = defineAsyncComponent(() => import('./CodeBlockEditor.vue'))
 
+// Quill porta in vista soltanto il rettangolo della selezione. Includere il
+// padding inferiore mantiene lo stesso respiro anche digitando, prima che il
+// cursore tocchi il bordo. Usiamo il suo punto di estensione per coprire Invio,
+// testo, incolla e spostamenti del cursore senza listener di scroll aggiuntivi.
+class NoteQuill extends Quill {
+  scrollRectIntoView(bounds) {
+    const margin = parseFloat(getComputedStyle(this.root).paddingBottom) || 0
+    super.scrollRectIntoView({
+      top: bounds.top,
+      right: bounds.right,
+      bottom: bounds.bottom + margin,
+      left: bounds.left
+    })
+  }
+}
+
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps({
   noteId: { type: String, default: null },
   content: { type: String, default: '' },
@@ -277,6 +295,7 @@ const props = defineProps({
   // di formattazione, così può stare visivamente sopra ai pulsanti azione
   // invece che nella posizione dove Quill la inserirebbe di default.
   toolbarContainer: { type: Object, default: null },
+  overlayContainer: { type: Object, default: null }
 })
 
 const emit = defineEmits(['change', 'claude', 'selection'])
@@ -285,6 +304,15 @@ const editorEl = ref(null)
 const quillEditorEl = ref(null)
 let quill = null
 let internalUpdate = false
+let disposed = false
+let headerPickerTimer = null
+const editorListeners = new AbortController()
+
+// La toolbar esterna sopravvive ai remount di Quill: tutti i listener che
+// registriamo devono essere rimossi insieme all'istanza della nota.
+function listen(target, event, handler) {
+  target?.addEventListener(event, handler, { signal: editorListeners.signal })
+}
 
 // Il blocco resta un formato Quill quando e' chiuso, quindi continua a
 // partecipare normalmente a salvataggio, Markdown e ricerca. Il pulsante
@@ -1240,7 +1268,7 @@ function scrollToCurrentMatch() {
   if (!m || !quill || !editorEl.value) return
   const bounds = quill.getBounds(m.index, m.length)
   if (!bounds) return
-  const container = editorEl.value
+  const container = quill.root
   const target = container.scrollTop + bounds.top - container.clientHeight / 2
   container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
 }
@@ -1378,6 +1406,7 @@ async function openTableMenu(event) {
   // il menu può uscire dal viewport se il click è vicino al bordo destro/basso
   // della finestra: lo si riposiziona solo dopo che è nel DOM (serve la sua misura reale).
   await nextTick()
+  if (disposed) return
   const rect = tableMenuEl.value?.getBoundingClientRect()
   if (!rect) return
   const margin = 8
@@ -1558,6 +1587,7 @@ onMounted(async () => {
   // dopo. Aspettarlo evita di ricadere sulla toolbar generata da Quill nella
   // sua posizione/stile di default.
   await nextTick()
+  if (disposed) return
 
   let toolbarContainer = toolbarOptions
   const externalToolbar = props.toolbarContainer
@@ -1566,7 +1596,7 @@ onMounted(async () => {
     toolbarContainer = externalToolbar
   }
 
-  quill = new Quill(editorEl.value, {
+  quill = new NoteQuill(editorEl.value, {
     theme: 'snow',
     modules: {
       toolbar: {
@@ -1609,10 +1639,10 @@ onMounted(async () => {
   // Niente pannello da aprire/chiudere via classe qui (vedi colorDropdown/
   // highlightDropdown sopra): il toggle apre l'overlay Vue3ColorPicker,
   // gestito con lo stato reattivo dichiarato a inizio file.
-  colorEl?.querySelector('.toolbar-dropdown-toggle')?.addEventListener('click', (event) => {
+  listen(colorEl?.querySelector('.toolbar-dropdown-toggle'), 'click', (event) => {
     openColorPicker('color', event.currentTarget)
   })
-  highlightEl?.querySelector('.toolbar-dropdown-toggle')?.addEventListener('click', (event) => {
+  listen(highlightEl?.querySelector('.toolbar-dropdown-toggle'), 'click', (event) => {
     openColorPicker('background', event.currentTarget)
   })
 
@@ -1631,15 +1661,14 @@ onMounted(async () => {
     if (highlightIndicatorEl) highlightIndicatorEl.style.fill = format.background || ''
   }
 
-
   // Tooltip: delega sul contenitore, e si nasconde appena il mouse esce o
   // si clicca (un pannello appena aperto non deve trovarselo sopra).
   const tipHost = props.toolbarContainer
   if (tipHost) {
-    tipHost.addEventListener('mouseover', onToolbarPointerOver)
-    tipHost.addEventListener('mouseleave', hideTooltip)
-    tipHost.addEventListener('mousedown', hideTooltip)
-    tipHost.addEventListener('scroll', hideTooltip)
+    listen(tipHost, 'mouseover', onToolbarPointerOver)
+    listen(tipHost, 'mouseleave', hideTooltip)
+    listen(tipHost, 'mousedown', hideTooltip)
+    listen(tipHost, 'scroll', hideTooltip)
   }
 
   // Le opzioni del picker dei titoli sono in position:absolute dentro la
@@ -1654,12 +1683,13 @@ onMounted(async () => {
     const options = headerPicker.querySelector('.ql-picker-options')
     // mousedown e non click: e' l'evento su cui Quill apre il picker, quindi
     // al frame successivo la classe ql-expanded c'e' gia'.
-    label?.addEventListener('mousedown', () => {
+    listen(label, 'mousedown', () => {
       if (!options) return
       // setTimeout(0) e non requestAnimationFrame: basta uscire dal task
       // corrente (quello in cui Quill ha appena espanso il picker), e non
       // dipende dalla produzione di un frame.
-      setTimeout(() => {
+      clearTimeout(headerPickerTimer)
+      headerPickerTimer = setTimeout(() => {
         if (!headerPicker.classList.contains('ql-expanded')) return
         const rect = label.getBoundingClientRect()
         options.style.position = 'fixed'
@@ -1667,7 +1697,7 @@ onMounted(async () => {
         options.style.left = `${Math.round(rect.left)}px`
       })
     })
-    props.toolbarContainer?.addEventListener('scroll', () => {
+    listen(props.toolbarContainer, 'scroll', () => {
       headerPicker.classList.remove('ql-expanded')
     })
   }
@@ -1677,9 +1707,9 @@ onMounted(async () => {
   loadContent(props.content)
   decorateCodeBlockHeaders()
   applySpellcheck()
-  quill.root.addEventListener('contextmenu', onEditorContextMenu)
-  quill.root.addEventListener('click', onEditorClick)
-  window.addEventListener('mousedown', onGlobalMousedown)
+  listen(quill.root, 'contextmenu', onEditorContextMenu)
+  listen(quill.root, 'click', onEditorClick)
+  listen(window, 'mousedown', onGlobalMousedown)
 
   quill.on('text-change', (_delta, _oldDelta, source) => {
     decorateCodeBlockHeaders()
@@ -1839,14 +1869,10 @@ defineExpose({
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('mousedown', onGlobalMousedown)
-  const tipHost = props.toolbarContainer
-  if (tipHost) {
-    tipHost.removeEventListener('mouseover', onToolbarPointerOver)
-    tipHost.removeEventListener('mouseleave', hideTooltip)
-    tipHost.removeEventListener('mousedown', hideTooltip)
-    tipHost.removeEventListener('scroll', hideTooltip)
-  }
+  disposed = true
+  clearTimeout(headerPickerTimer)
+  editorListeners.abort()
+  endCropDrag()
   hideTooltip()
   quill = null
 })
@@ -1879,7 +1905,10 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* La radice gestisce la propria dimensione; gli overlay sono fuori flusso. */
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 /* Cerca nella nota: barra fissa in alto a destra rispetto all'area di
@@ -2220,15 +2249,20 @@ onBeforeUnmount(() => {
 .quill-editor :deep(.ql-container) {
   border: none;
   flex: 1;
-  overflow-y: auto;
+  height: auto;
+  min-height: 0;
+  /* Solo .ql-editor scorre: due viewport annidati possono lasciare la
+     parte alta fuori dal contenitore raggiungibile con la rotella. */
+  overflow: hidden;
   font-family: inherit;
   font-size: 15px;
 }
 
 .quill-editor :deep(.ql-editor) {
-  /* Più respiro sotto l'ultimo elemento: quando si arriva in fondo alla nota,
-     testo e blocchi non devono appoggiarsi al bordo dell'area di scorrimento. */
-  padding: 22px 24px 72px;
+  overflow-y: auto;
+  /* Margine inferiore uguale a quello laterale, usato anche da NoteQuill
+     per mantenere spazio sotto il cursore durante la digitazione. */
+  padding: 22px 24px 24px;
   line-height: 1.6;
 }
 

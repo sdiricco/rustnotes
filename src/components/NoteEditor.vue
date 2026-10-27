@@ -1,173 +1,165 @@
 <template>
-  <section class="note-editor">
-    <div v-if="!store.selectedNote" class="empty-state">
-      <Icon icon="lucide:notebook-pen" />
-      <p>{{ t('editor.emptyState') }}</p>
-    </div>
+  <section class="editor-workspace">
+    <AppHeader
+      :sidebar-visible="sidebarVisible"
+      :browse-in-layout="browseInLayout"
+      @toggle-sidebar="emit('toggle-sidebar')"
+    >
+      <template #note-actions>
+        <div v-if="store.selectedNote" class="action-card">
+          <button
+            class="icon-btn"
+            :title="t('editor.findInNote', { shortcut: shortcut('mod+F') })"
+            @click="quillEditorRef?.toggleFindBar()"
+          >
+            <Icon icon="lucide:search" />
+          </button>
+          <button
+            class="icon-btn"
+            :title="
+              store.selectedNote.pinned
+                ? t('editor.removeFromFavorites')
+                : t('editor.addToFavorites')
+            "
+            @click="store.togglePin(store.selectedNote.id)"
+          >
+            <Icon icon="lucide:star" :class="{ filled: store.selectedNote.pinned }" />
+          </button>
+          <button
+            v-if="!store.selectedNote.trashed"
+            class="icon-btn"
+            data-testid="trash-note"
+            :title="t('editor.moveToTrash')"
+            @click="moveToTrash"
+          >
+            <Icon icon="lucide:trash-2" />
+          </button>
+          <button
+            v-else
+            class="icon-btn"
+            :title="t('editor.restore')"
+            @click="store.restoreNote(store.selectedNote.id)"
+          >
+            <Icon icon="lucide:rotate-ccw" />
+          </button>
 
-    <template v-else>
-      <div class="editor-header">
-        <!-- Toolbar di formattazione di Quill: montata qui (contenitore esterno,
-             vedi toolbar-container su QuillEditor) per stare sopra ai pulsanti
-             azione invece che nella posizione di default. -->
-        <div ref="quillToolbarEl" class="floating-toolbar"></div>
-
-        <!-- Cerca, preferiti e cestino sempre visibili; le azioni poco usate
-             stanno nel menu "⋮". Non c'e' piu' una soglia che li faccia
-             migrare nel menu: stando nell'header principale, che tronca il
-             breadcrumb per far posto, lo spazio non gli manca mai. -->
-        <!-- Teleportate nell'header principale (#header-note-actions in
-             AppHeader): markup e logica restano qui — dialogo Markdown,
-             riferimento all'editor per la ricerca nella nota, ortografia — e
-             cambia solo dove finiscono nel DOM.
-             `defer` e' indispensabile: il bersaglio e' reso nello stesso
-             albero, e senza di esso Teleport lo cerca prima che esista,
-             fallendo con "emitsOptions null" e impedendo il montaggio di
-             QuillEditor (toolbar vuota). Disponibile da Vue 3.5. -->
-        <Teleport defer to="#header-note-actions">
-          <div class="action-card">
-            <!-- Azioni Claude (claudeActions.js): il pulsante c'e' solo se la
-                 CLI di Claude Code e' installata e l'utente non l'ha nascosta
-                 in Impostazioni. Il menu dice su cosa agisce (selezione o
-                 nota) e, se manca l'accesso, rimanda a Impostazioni. -->
+          <div ref="actionOverflowEl" class="action-overflow">
             <button
               class="icon-btn"
-              :title="t('editor.findInNote', { shortcut: shortcut('mod+F') })"
-              @click="quillEditorRef?.toggleFindBar()"
+              :title="t('editor.moreActions')"
+              @click="actionMenuOpen = !actionMenuOpen"
             >
-              <Icon icon="lucide:search" />
+              <Icon icon="lucide:ellipsis" />
             </button>
-            <button
-              class="icon-btn"
-              :title="
-                store.selectedNote.pinned
-                  ? t('editor.removeFromFavorites')
-                  : t('editor.addToFavorites')
-              "
-              @click="store.togglePin(store.selectedNote.id)"
-            >
-              <Icon icon="lucide:star" :class="{ filled: store.selectedNote.pinned }" />
-            </button>
-            <button
-              v-if="!store.selectedNote.trashed"
-              class="icon-btn"
-              data-testid="trash-note"
-              :title="t('editor.moveToTrash')"
-              @click="moveToTrash"
-            >
-              <Icon icon="lucide:trash-2" />
-            </button>
-            <button
-              v-else
-              class="icon-btn"
-              :title="t('editor.restore')"
-              @click="store.restoreNote(store.selectedNote.id)"
-            >
-              <Icon icon="lucide:rotate-ccw" />
-            </button>
-
-            <div ref="actionOverflowEl" class="action-overflow">
-              <button
-                class="icon-btn"
-                :title="t('editor.moreActions')"
-                @click="actionMenuOpen = !actionMenuOpen"
-              >
-                <Icon icon="lucide:ellipsis" />
+            <div v-if="actionMenuOpen" class="action-overflow-menu">
+              <button @click="(importNote(), (actionMenuOpen = false))">
+                <Icon icon="lucide:upload" />
+                <span>{{ t('editor.importMarkdown') }}</span>
               </button>
-              <div v-if="actionMenuOpen" class="action-overflow-menu">
-                <button @click="(importNote(), (actionMenuOpen = false))">
-                  <Icon icon="lucide:upload" />
-                  <span>{{ t('editor.importMarkdown') }}</span>
-                </button>
-                <button @click="(openMarkdownPreview(), (actionMenuOpen = false))">
-                  <Icon icon="lucide:file-code" />
-                  <span>{{ t('editor.markdownMenu') }}</span>
-                </button>
-                <button @click="settings.toggleSpellcheck()">
-                  <Icon icon="lucide:spell-check" />
-                  <span>{{
-                    settings.spellcheck ? t('editor.spellcheckOn') : t('editor.spellcheckOff')
-                  }}</span>
-                </button>
-                <button @click="(api.revealDataFile(), (actionMenuOpen = false))">
-                  <Icon icon="lucide:folder-open" />
-                  <span>{{ t('editor.revealInFinder', isMac ? 1 : 2) }}</span>
-                </button>
-              </div>
+              <button @click="(openMarkdownPreview(), (actionMenuOpen = false))">
+                <Icon icon="lucide:file-code" />
+                <span>{{ t('editor.markdownMenu') }}</span>
+              </button>
+              <button @click="settings.toggleSpellcheck()">
+                <Icon icon="lucide:spell-check" />
+                <span>{{
+                  settings.spellcheck ? t('editor.spellcheckOn') : t('editor.spellcheckOff')
+                }}</span>
+              </button>
+              <button @click="(api.revealDataFile(), (actionMenuOpen = false))">
+                <Icon icon="lucide:folder-open" />
+                <span>{{ t('editor.revealInFinder', isMac ? 1 : 2) }}</span>
+              </button>
             </div>
           </div>
-        </Teleport>
+        </div>
+      </template>
+    </AppHeader>
+
+    <div ref="editorPaneEl" class="note-editor">
+      <div v-if="!store.selectedNote" class="empty-state">
+        <Icon icon="lucide:notebook-pen" />
+        <p>{{ t('editor.emptyState') }}</p>
       </div>
 
-      <QuillEditor
-        ref="quillEditorRef"
-        :key="`${store.selectedNote.id}-${reloadCounter}`"
-        :note-id="store.selectedNote.id"
-        :content="store.selectedNote.content"
-        :toolbar-container="quillToolbarEl"
-        class="editor-body"
-        @change="onContentChange"
-        @claude="toggleAssistant"
-        @selection="onEditorSelection"
-      />
+      <template v-else>
+        <div class="editor-header">
+          <!-- Toolbar di formattazione di Quill: montata qui (contenitore esterno,
+             vedi toolbar-container su QuillEditor) per stare sopra ai pulsanti
+             azione invece che nella posizione di default. -->
+          <div ref="quillToolbarEl" class="floating-toolbar"></div>
+        </div>
 
-      <!-- Assistente Claude: pulsante fisso in basso a destra, come un widget
+        <QuillEditor
+          ref="quillEditorRef"
+          :key="`${store.selectedNote.id}-${reloadCounter}`"
+          :note-id="store.selectedNote.id"
+          :content="store.selectedNote.content"
+          :toolbar-container="quillToolbarEl"
+          :overlay-container="editorPaneEl"
+          @change="onContentChange"
+          @claude="toggleAssistant"
+          @selection="onEditorSelection"
+        />
+
+        <!-- Assistente Claude: pulsante fisso in basso a destra, come un widget
            di assistenza; il pannello si apre sopra di lui (ClaudeAssistant).
            C'e' solo se la CLI di Claude Code e' installata e la funzione e'
            accesa in Impostazioni. -->
-      <button
-        v-if="claudeVisible"
-        class="claude-fab"
-        :class="{ open: Boolean(assistant) }"
-        :title="`${t('editor.claude.menu')} (${shortcut('mod+J')})`"
-        @click="toggleAssistant"
-      >
-        <Icon :icon="assistant ? 'lucide:x' : 'lucide:sparkles'" />
-      </button>
+        <button
+          v-if="claudeVisible"
+          class="claude-fab"
+          :class="{ open: Boolean(assistant) }"
+          :title="`${t('editor.claude.menu')} (${shortcut('mod+J')})`"
+          @click="toggleAssistant"
+        >
+          <Icon :icon="assistant ? 'lucide:x' : 'lucide:sparkles'" />
+        </button>
 
-      <ClaudeAssistant
-        :open="Boolean(assistant)"
-        :on-selection="Boolean(assistant?.range)"
-        :ready="claude.ready"
-        :run="claudeRun"
-        @action="
-          (a) =>
-            startClaude(buildInstruction(a, assistant), {
-              action: a,
-              label: t(`editor.claude.actions.${a.id}`)
-            })
-        "
-        @ask="(q) => startClaude(buildFree(q, assistant), { action: null, label: q })"
-        @refine="refineClaude"
-        @retry="retryClaude"
-        @replace="applyClaude('replace')"
-        @insert="applyClaude('insert')"
-        @copy="copyClaude"
-        @close="closeAssistant"
-        @settings="(ui.openSettings('claude'), closeAssistant())"
-      />
+        <ClaudeAssistant
+          :open="Boolean(assistant)"
+          :on-selection="Boolean(assistant?.range)"
+          :ready="claude.ready"
+          :run="claudeRun"
+          @action="
+            (a) =>
+              startClaude(buildInstruction(a, assistant), {
+                action: a,
+                label: t(`editor.claude.actions.${a.id}`)
+              })
+          "
+          @ask="(q) => startClaude(buildFree(q, assistant), { action: null, label: q })"
+          @refine="refineClaude"
+          @retry="retryClaude"
+          @replace="applyClaude('replace')"
+          @insert="applyClaude('insert')"
+          @copy="copyClaude"
+          @close="closeAssistant"
+          @settings="(ui.openSettings('claude'), closeAssistant())"
+        />
 
-      <Dialog
-        v-model:visible="markdownPreviewOpen"
-        modal
-        :header="t('editor.markdownDialogTitle')"
-        :style="{ width: '38rem' }"
-        :draggable="false"
-        dismissable-mask
-      >
-        <pre class="markdown-preview">{{ markdownPreviewText }}</pre>
-        <template #footer>
-          <button class="md-action-btn" @click="copyNote">
-            <Icon icon="lucide:copy" />
-            <span>{{ t('editor.copy') }}</span>
-          </button>
-          <button class="md-action-btn primary" @click="exportNote">
-            <Icon icon="lucide:download" />
-            <span>{{ t('editor.download') }}</span>
-          </button>
-        </template>
-      </Dialog>
-    </template>
+        <Dialog
+          v-model:visible="markdownPreviewOpen"
+          modal
+          :header="t('editor.markdownDialogTitle')"
+          :style="{ width: '38rem' }"
+          :draggable="false"
+          dismissable-mask
+        >
+          <pre class="markdown-preview">{{ markdownPreviewText }}</pre>
+          <template #footer>
+            <button class="md-action-btn" @click="copyNote">
+              <Icon icon="lucide:copy" />
+              <span>{{ t('editor.copy') }}</span>
+            </button>
+            <button class="md-action-btn primary" @click="exportNote">
+              <Icon icon="lucide:download" />
+              <span>{{ t('editor.download') }}</span>
+            </button>
+          </template>
+        </Dialog>
+      </template>
+    </div>
   </section>
 </template>
 
@@ -181,12 +173,19 @@ import { useNotesStore } from '../stores/notes'
 import { useSettingsStore } from '../stores/settings'
 import { useUiStore } from '../stores/ui'
 import { useClaudeStore } from '../stores/claude'
+import AppHeader from './AppHeader.vue'
 import QuillEditor from './QuillEditor.vue'
 import ClaudeAssistant from './ClaudeAssistant.vue'
 import { htmlToMarkdown, markdownToHtml } from '../utils/markdown'
 import { api } from '../utils/api'
 import { isMac, shortcut } from '../utils/shortcuts'
 import { buildInstruction, buildFree, buildFollowUp, stripOuterFence } from '../utils/claudeActions'
+
+defineProps({
+  sidebarVisible: { type: Boolean, default: true },
+  browseInLayout: { type: Boolean, default: false }
+})
+const emit = defineEmits(['toggle-sidebar'])
 
 const store = useNotesStore()
 const settings = useSettingsStore()
@@ -196,6 +195,7 @@ const toast = useToast()
 const { t } = useI18n()
 
 const quillToolbarEl = ref(null)
+const editorPaneEl = ref(null)
 const quillEditorRef = ref(null)
 // L'import sostituisce il contenuto della nota già aperta: QuillEditor lo ricarica
 // solo quando cambia il suo :key (osserva solo noteId, non il content prop), quindi
@@ -459,8 +459,17 @@ async function copyNote() {
 </script>
 
 <style scoped>
+.editor-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
 .note-editor {
-  height: 100%;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--editor-bg);
@@ -479,28 +488,17 @@ async function copyNote() {
   font-size: 30px;
 }
 
-/* Barra unica a tutta larghezza (non più due pillole separate): la toolbar
-   di formattazione (uso frequente) sta a sinistra, le azioni sulla nota (uso
-   saltuario) a destra, con un bordo inferiore che separa dal contenuto,
-   come una vera toolbar d'app invece di due card fluttuanti. Ogni gruppo
-   nasconde i controlli meno usati in un proprio menu overflow (vedi
-   .toolbar-overflow-panel e .action-overflow-menu) invece di andare a capo,
-   così l'altezza dell'header resta costante a qualunque larghezza. */
+/* La toolbar occupa spazio nel flusso, fuori dalla viewport del testo.
+   Non serve sticky: a scorrere e' soltanto .ql-editor. */
 .editor-header {
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 2;
   display: flex;
-  /* Centrata: da quando le azioni sono teleportate nell'header principale,
-     qui resta solo la toolbar, e allinearla a sinistra la lasciava
-     squilibrata. */
+  /* Le azioni sono nello slot dell'header, qui resta solo la formattazione. */
   justify-content: center;
   align-items: center;
   gap: 6px;
   padding: 12px 16px;
-  /* Sfondo pieno, uguale a quello dell'editor: l'header e' position: sticky,
-     quindi con background trasparente il testo che scorre gli passava dietro
-     e si sovrapponeva alla toolbar. */
   background: var(--editor-bg);
 }
 
@@ -623,11 +621,6 @@ async function copyNote() {
 }
 .icon-btn :deep(svg.filled path) {
   fill: var(--p-text-color);
-}
-
-.editor-body {
-  flex: 1;
-  min-height: 0;
 }
 
 .markdown-preview {

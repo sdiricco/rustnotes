@@ -40,6 +40,26 @@ Note and folder objects are untyped JSON on the Rust side on purpose: the schema
 lives in `src/stores/notes.js`. Adding a field to a note does not require
 touching Rust.
 
+### Desktop layout and scrolling
+
+- `App.vue` assigns the available width to the sidebar and `NoteEditor`.
+  `NoteEditor` owns a two-row grid: `AppHeader` and `minmax(0, 1fr)` for the
+  editor pane. Header actions use a named slot, not a global Teleport target.
+- The formatting toolbar stays in normal flow. Only `.ql-editor` scrolls
+  vertically; its ancestors must fit the viewport and have no scroll range.
+  Flexible children need explicit zero minimum sizes, not `height: 100%`
+  alongside fixed-height siblings. `overflow: clip` is not a sizing fix.
+- Components with several roots explicitly forward attributes to their visual
+  root. CodeMirror receives its overlay destination as an element reference.
+  Teleport is reserved for overlays, not the main layout.
+- Quill owns and cleans up its DOM listeners and timers, including those on
+  the external toolbar that survives switching notes.
+- Note and folder lists scroll independently of their top bars. Search,
+  settings and assistant panels own their respective scroll areas.
+
+The desktop E2E suite checks long notes, narrow/short windows, header and
+toolbar geometry, in-note search, switching notes, and the CodeMirror overlay.
+
 ## i18n: adding or changing strings
 
 - Strings live in `src/i18n/<locale>/<domain>.js`. The supported locale trees

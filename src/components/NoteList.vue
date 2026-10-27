@@ -548,6 +548,7 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
 }
 
 .note-list-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -632,6 +633,7 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
 }
 
 .sort-row {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -683,6 +685,7 @@ defineExpose({ openSearch: () => globalSearchRef.value?.openSearch() })
 
 .note-items {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 2px 6px 8px;
 }
