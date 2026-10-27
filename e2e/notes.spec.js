@@ -144,6 +144,9 @@ describe('gestione note', () => {
     await headerTitle.click()
     await $('[data-testid="header-title-input"]').setValue(title)
     await browser.keys('Enter')
+    // La rinomina sostituisce il pulsante con un input e poi con un nuovo
+    // pulsante: il riferimento precedente e' stale su WebView2.
+    await expect($('[data-testid="header-title"]')).toHaveText(title)
 
     const editor = $('.ql-editor')
     // Invio deve passare da Quill: assegnare una stringa multilinea al
@@ -174,7 +177,7 @@ describe('gestione note', () => {
       }
     })
 
-    await expect(headerTitle).toHaveText(title)
+    await expect($('[data-testid="header-title"]')).toHaveText(title)
     expect(layout.headerVisible).toBe(true)
     expect(layout.headerTop).toBeGreaterThanOrEqual(0)
     expect(layout.mainScrollTop).toBe(0)
